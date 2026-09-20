@@ -94,6 +94,29 @@ Internal units are cm. `ValueInput.createByString('30 mm')` accepts unit suffixe
 74. Self-supporting ramp as a loft between two XY-plane profiles
 75. Nozzle-relative printability gates for flat-plate art
 
+### Woodworking design knowledge (UI-level technique, not code snippets; from tutorial review, 2026-09-20)
+
+76. Woodworking tutorial corpus: source-quality tiering (read before trusting entries 77+)
+77. Command reference: Sketch
+78. Command reference: Extrude
+79. Command reference: Fillet
+80. Command reference: Chamfer
+81. Command reference: Combine -- the core joinery-cutting technique
+82. Command reference: Hole
+83. Parametric setup: user parameters and derived expressions
+84. Sketch discipline: anchoring, constraints, coincidence
+85. Components vs. bodies vs. new-component-per-part
+86. Duplication choices: Mirror vs. Rectangular Pattern vs. Pattern on Path vs. Move/Copy vs. Copy/Paste
+87. Sliding dovetail joinery (parametric technique)
+88. Mortise & tenon / dado / rabbet via the Combine "virtual router" technique
+89. Drawer construction (front-to-opening constraint technique)
+90. Raised panel door (cope-and-stick modeling)
+91. Joints (assembly "glue") and motion for drawers/doors
+92. Exploded views & posed views via the Animation workspace
+93. Materials: physical vs. appearance
+94. Rendering workflow
+95. Drawings, cut-lists / BOM, title blocks
+
 ## 1. Idempotent user-parameter add
 
 Make every script safe to re-run.
@@ -2464,3 +2487,397 @@ The dominant defect these catch is not thin limbs, it is the **near-miss**: two 
 0.12 to 0.90 mm apart, or crossing at a shallow tangential angle. Five of them on one part. Shapes
 must either clearly overlap or clearly separate; the near-miss is the only bad case, and it is
 invisible at any zoom level a human would use.
+
+## 76. Woodworking tutorial corpus: source-quality tiering (read before trusting entries 77+)
+
+Entries 77-95 and the dated 2026-09-20 entries in gotchas.md were distilled from ~40 YouTube
+tutorials on Fusion 360 for woodworking, reviewed critically rather than taken as authoritative.
+Source-quality varies a lot; weight accordingly:
+
+- **"Fusion Friday for Woodworkers" single-command episodes** (Sketch, Extrude, Fillet, Chamfer,
+  Combine, Hole) are the most reliable source here: each episode isolates one command in a clean
+  demo with no live-project mistakes. Good as a UI command reference. They do NOT demonstrate
+  named user-parameters at all (every dimension is a literal typed into the dialog) -- treat them
+  as command-syntax reference, not parametric-technique reference.
+- **The 15-lesson "Fusion 360 for Woodworkers" build series** (a single cabinet-with-drawers
+  project built start to finish) is the richest source for both real parametric technique (user
+  parameters, derived expressions, mirror/pattern, joints, rendering, drawings) AND real mistakes
+  made live on camera -- most of the dated gotchas below trace back to this series precisely
+  because the instructor's errors are visible and narrated.
+- **Standalone one-off videos are mixed quality.** Several ("Modeling a Bookshelf", "Modeling a
+  FRAMED SHED", "BEGINNERS START HERE") hardcode every dimension with zero named parameters
+  despite being filed under a "for Woodworkers" series banner -- useful only as UI tutorials, not
+  as parametric-design references. One video explicitly titled "Parametric Modeling for Cabinet
+  Drawers" earns its claim only partially: its drawer-count/height formula genuinely is
+  parameter-driven, but the presenter admits mid-video he doesn't understand bodies vs.
+  components, and he breaks his own model's parametric linkage by deleting dimension annotations
+  to declutter the sketch (deleting a dimension deletes the constraint it displays -- hide
+  dimensions instead of deleting them).
+- Where two sources conflict (e.g. mirroring vs. copying for BOM-scheduled parts), both sides are
+  noted rather than silently picking one.
+
+## 77. Command reference: Sketch
+
+Three-step workflow: select a construction plane -> draw geometry -> constrain with dimensions.
+Fusion shows 6 orange construction-plane options (top/front/right/back/bottom/left of the implicit
+bounding cube) when you start a sketch; pick the one matching what you're drawing (e.g. the right
+plane for a cupboard's side panel). Default good practice: anchor the first sketch at the world
+origin (0,0,0) unless there's a specific reason not to -- everything else measures from there.
+Black sketch lines = fully constrained/known; blue = underdefined, and can still be dragged. The
+Sketch Dimension tool is what converts blue lines to black by giving them an explicit length/
+position tied to a reference (commonly the origin).
+
+## 78. Command reference: Extrude
+
+Direction: One Side, Two Sides (independently draggable), or Symmetric (mirrors around the sketch
+plane). Extent: a set Distance, To Object (terminate exactly at a selected reference face -- use
+this instead of a guessed distance whenever a feature must land exactly on another part's surface,
+e.g. a tenon that must reach the far wall of its mortise), or Through All. Taper angle available
+for angled extrudes (0 for square stock). Operation dropdown: New Body, New Component, Join, Cut,
+Intersect -- **Fusion guesses this based on geometry overlap and the guess is frequently wrong for
+a woodworker's intent** (see gotchas.md). For a tenon on existing stock: extrude positive with
+Join. For a mortise: extrude negative with Cut (sometimes auto-selected once geometry overlaps,
+but verify).
+
+## 79. Command reference: Fillet
+
+Two distinct tools live under one button: Fillet (simple, described below) and Rule Fillet
+(parametric, ties the fillet's behavior to the model so it scales correctly -- explicitly
+deferred as "advanced, future episode" in the source material and not itself demonstrated with
+worked examples). Treat the plain Fillet tool as visually convenient but not the parametric-safe
+option; if a fillet must survive significant resizing, look at Rule Fillet specifically before
+relying on plain Fillet. Plain Fillet options: **Curve type** Tangent (curve tangent to the
+intersecting edges) vs Curvature (a more gradual, different-looking blend) -- visibly different
+end profiles, pick by eye/requirement. **Radius type** Constant (one radius along the whole edge)
+vs Variable (two independent start/end radius arrows -- useful for a tapering round-over or
+shaping a sloped chamfer-like transition). Selecting a whole **face** fillets all its edges in one
+operation; multiple faces can be selected together for a one-shot fillet across unrelated edges.
+**Corner Type** (only visible where 3+ filleted edges meet at a corner): Rolling Ball vs Setback --
+changes how the corner blends; easy to never touch and leave on the (Rolling Ball) default, which
+may not match a real router's corner geometry. **Chord Length**: a special radius mode for filleting
+a straight chord line across a circular face (e.g. a flat cut across a dowel) without the fillet
+bending to follow the circle's own curvature -- use this specifically when the edge being filleted
+is a chord, not an arc. Fillets only blend edges belonging to a **single body/component** -- two
+touching-but-separate bodies will not blend across their shared edge; Join them first (Combine) if
+a continuous blended fillet across two parts is wanted. Practical woodworking use: apply a small
+(~2-2.5 mm) fillet to a modeled mortise's internal corners to represent the rounded corners a real
+router leaves, rather than leaving CAD-perfect square corners that don't match the real joint
+(square the tenon's corners instead, or fillet both to match, depending on whether you plan to
+chisel the mortise square by hand).
+
+## 80. Command reference: Chamfer
+
+Modify > Chamfer (shortcut not given). Works on **edges only** (unlike Fillet, cannot select a
+whole face to imply its edges). Three types: **Equal Distance** (single 45-style bevel dimension),
+**Two Distances** (independent across-the-surface distance and depth-of-cut, for an asymmetric
+bevel), **Distance and Angle** (one linear distance plus an explicit angle -- dragging the angle
+to its extreme, e.g. on a cylinder, produces a full cone taper, useful for shop-made pencil-style
+points or tapered dowels). Multiple edges can be selected and chamfered uniformly in one operation.
+**Tangent Chain** toggle (off by default): off = chamfers only the exact edge picked; on = auto-
+extends the selection to every edge that is tangentially continuous with it (e.g. all the way
+around a previously-filleted rounded corner) as a single smooth chamfer -- turn this on whenever
+chamfering a rounded/filleted profile, or the result will be visually discontinuous at the round.
+Also works on cylindrical/curved edges (rounding a dowel end).
+
+## 81. Command reference: Combine -- the core joinery-cutting technique
+
+Modify > Combine performs a boolean between a **Target Body** (the piece being modified) and one
+or more **Tool Bodies** (the piece doing the modifying), with three operations: **Join** (fuse into
+one body), **Cut** (subtract the tool from the target -- the everyday joinery operation), and
+**Intersect** (keep only the overlapping volume -- rarely useful in a woodworking context per the
+source material; no clear woodworking use case was demonstrated for it across the whole corpus).
+**"Keep Tools" is unchecked by default** and must be explicitly enabled for essentially every
+woodworking use, because without it the tool body (e.g. the tenon board itself) is deleted after
+the cut. "Create New Component" bundles the result into a fresh component -- useful for
+templates/repeated-use geometry, not needed for ordinary one-off joinery.
+
+The canonical joinery workflow demonstrated repeatedly across the corpus ("virtual router"
+technique): **model the male part first** (e.g. sketch+extrude a tenon onto one board with Join),
+position the two boards so the male feature overlaps the target board's volume, then run
+**Combine > Cut, Keep Tools** with the target = the board being cut into and tool = the board
+carrying the male feature. This guarantees a perfect mechanical fit because the female cut is
+derived directly from the male part's actual geometry rather than measured independently and
+re-entered (which risks a fit-breaking transcription error). The same technique generalizes to
+dados, rebates, stopped-housing joints, half-laps, dovetail housings, and sliding-dovetail sockets
+-- model (or position) the male geometry, then cut the female pocket from it via Combine. Right-
+click > "Repeat Combine" speeds up cutting the same joint at multiple locations.
+
+## 82. Command reference: Hole
+
+Create > Hole (shortcut H). Placement: **Single** (needs 1-2 reference-point offsets measured from
+an edge/face/another object -- can also be used just to place a precisely-positioned arc/cutout,
+not only round through-holes) or **Multiple** (driven by pre-placed, dimensioned Sketch Points --
+create the points on a face via Create > Point in Sketch mode, dimension their positions/spacing,
+finish the sketch, then feed those points to Hole's multiple-placement mode for a one-shot
+dimensioned grid of holes). Extent: Distance, To Object, or Through All. Hole Type: Simple,
+Counterbore, Countersink (dialog's preview diagram updates live to match the choice). **Tap Type**:
+None (plain hole), Clearance (unthreaded, sized for a fastener shank), Tapped, or Tapered Tapped
+(for pipe-style fittings) -- Tapped/Tapered options expose a **Modeled Threads** toggle that
+generates real, cuttable thread geometry (thread standard selectable: ISO metric, ACME, BSP, DIN,
+etc., with designation/pitch/class/hand-of-thread options), useful for shop-made threaded wood
+inserts, jig lead-screws, or knobs. This capability is easy to overlook -- it never came up again
+even in later drawer-pull/handle work in the corpus (which used Revolve instead), so it's worth
+deliberately considering whenever a project needs an actual thread rather than a plain clearance
+hole. Drill point choice: flat-bottom vs angled (twist-drill) bottom -- flat is usually correct for
+woodworking (Kreg-style pocket holes, dowel holes, threaded inserts all use flat-bottom bits),
+whereas the angled default mimics a metal twist drill and looks wrong for typical shop hardware.
+
+## 83. Parametric setup: user parameters and derived expressions
+
+Define global user parameters (Modify > Change Parameters) *before* sketching: overall
+height/width/depth, stock/material thickness(es), reveal/clearance gaps, joinery-depth ratios,
+instance counts for patterns. Reference every sketch dimension and extrude distance by parameter
+name rather than typing a literal number, so one edit cascades through the whole model. Chain
+derived parameters off base parameters via typed expressions (e.g. `joinery = stock_thickness / 3`,
+`drawer_height = (box_height - ply_thickness*2 - drawer_spacing*(n+1)) / n`) rather than
+pre-computing the arithmetic by hand and typing in the result -- the strongest example in the
+corpus is a drawer-height formula that reflows every drawer's height correctly when either the
+drawer count or overall box height changes. Type expressions directly into a dimension field (e.g.
+`total_width - ply_thickness*2`) instead of a literal. After building each major parametric
+feature, stress-test it by pushing key parameters to extreme values (including 0, where relevant,
+e.g. a patterned support count) to confirm the model rebuilds cleanly and mechanisms (sliding
+drawers, mirrored joints) still work -- treat this as a standard regression check, not optional.
+
+## 84. Sketch discipline: anchoring, constraints, coincidence
+
+Fusion does **not** auto-weld touching sketch geometry -- a line endpoint that merely looks snapped
+to another point/edge needs an explicit **coincident constraint**, or it silently breaks on a
+parametric resize (confirmed independently across multiple sources in the corpus). Pick one
+consistent anchor point/corner convention across related sketches (e.g. "always the outer bottom
+corner") -- inconsistent anchoring is a repeatedly-cited cause of parameter edits distorting the
+model in unexpected directions. Where a new sketch must fit an already-built part, prefer snapping/
+constraining its geometry directly to the existing part's edges (or via a **collinear constraint**
+against the opening it must fit) over re-deriving the same size from parameters a second time --
+this is how the corpus's most robust drawer-front technique works: the front is drawn oversized on
+its own plane, then its four edges are made collinear with the four edges of the cabinet opening,
+so the front auto-resizes with the opening with no manual dimension math at all. Never sketch on a
+face of a body that could disappear under some parameter combination (e.g. a component whose
+pattern count can reach 0) -- anchor to an offset construction plane tied to a feature guaranteed
+to exist instead, and Project the needed geometry onto it.
+
+## 85. Components vs. bodies vs. new-component-per-part
+
+Extrude each distinct physical part as **New Component** (not New Body, and not Join, even when
+its faces touch a neighboring part) -- this is the single most repeated piece of advice across the
+whole corpus and also the single most repeated mistake (Fusion defaults the operation dropdown to
+Join whenever a new profile touches existing solid geometry, silently merging two real, separate
+parts into one body/component). Bodies are "dumb" 3D geometry only; converting to a Component is
+what gives a part identity (name, assigned material, custom properties) that a generated cut-list/
+BOM or a drawing table can actually schedule -- one source's drawer-height parametric technique is
+otherwise excellent but the presenter admits he doesn't understand the body/component distinction
+at all, which is flagged as a real gap. Rename each component immediately with a convention like
+`material-thickness-dimensions` (e.g. "plywood-1/4in-42x29") -- a BOM/parts-table tool rolls
+quantities up by matching component name, so the naming convention chosen at modeling time
+directly determines whether the generated cut list is usable. Group related components under an
+empty parent "folder" component (a sub-assembly) to keep the browser tree navigable and to make a
+whole group isolatable/toggle-able/duplicatable as a unit -- plan this hierarchy before building
+out repetitive geometry rather than retrofitting it once the tree is already cluttered (a mistake
+made in more than one source).
+
+## 86. Duplication choices: Mirror vs. Rectangular Pattern vs. Pattern on Path vs. Move/Copy vs. Copy/Paste
+
+- **Mirror** (Create > Mirror; pattern type Feature, Body, or Component) is preferred for genuinely
+  symmetric parts (opposite side panels, a joint cut mirrored to the far end of a board, a door
+  mirrored into its symmetric pair) over manually measuring and re-entering an offset. Build the
+  mirror plane deliberately -- a Midplane construction plane between the two real reference faces,
+  or an Offset Plane at `dimension/2` -- rather than eyeballing a distance. **Never delete a
+  construction plane that a mirror (or anything else) depends on**; this is the single
+  most-repeated specific gotcha in the corpus (cited independently at least four times across
+  different videos/lessons).
+- **Rectangular Pattern** (by spacing, not extent) suits evenly-repeated identical members along
+  one axis (studs, slats, shelf dividers, repeated drawer-front geometry) -- feed it a parametric
+  spacing expression, not a literal, and remember pattern spacing is measured **center-to-center**
+  between the first and last instance, not edge-to-edge (see gotchas.md). When a pattern needs N
+  "middle" repeats plus fixed end members, set the pattern quantity to `parameter + 2` so the named
+  parameter cleanly represents only the middle count.
+- **Pattern on a Path** duplicates a template component along an existing edge/curve, driven by
+  either an explicit count or a total-distance/spacing expression -- effective for placing a row of
+  internal panels/shelves/drawer dividers fast, with unwanted instances then unchecked individually.
+- **Move/Copy, point-to-point, with "Create Copy" checked** is the most precise way to duplicate a
+  part to one specific new location when the relationship isn't a clean mirror or repeating pattern
+  (e.g. a stepping/non-mirror-symmetric corner shelf module) -- also acceptable as a fallback when
+  the exact mirror/pattern spacing genuinely isn't known yet, though this is really a workaround
+  for an underdimensioned design and should be replaced with a real constraint/parameter once the
+  spacing is known.
+- **Copy/Paste of an already-built, already-jointed sub-assembly** (e.g. a whole drawer, joinery and
+  all) is the fastest way to replicate a complete assembled unit at a new size/location -- pair it
+  with a single Joint operation to both snap the copy into position (via matching reference edge/
+  point) and set its motion in one step, rather than re-modeling or re-joining by hand.
+- **Conflicting advice in the corpus, worth knowing:** mirroring vs. copying for parts that will
+  later be scheduled in a drawing's BOM table. One source explicitly found that mirrored
+  instances list as separate line items in the generated parts table rather than rolling up into
+  "quantity 2" of the shared component, and states he "should have just copied them" instead;
+  another source uses mirroring for BOM-scheduled parts (roof rafters) without checking or flagging
+  whether the same fragmentation occurs there. Until verified otherwise, **prefer Copy over Mirror
+  for parts that must count correctly in an auto-generated BOM**, and use Mirror for its geometric
+  guarantees when BOM roll-up doesn't matter.
+
+## 87. Sliding dovetail joinery (parametric technique)
+
+Drive dovetail proportions off a `joinery` parameter (commonly `stock_thickness / 3`) rather than a
+fixed number, so joinery scales with stock choice. Rough-sketch the dovetail profile with the line
+tool, then constrain: the two arm widths to `joinery`, the top-offset/taper to a fraction of
+`joinery` (e.g. `joinery/3`), and for a true parametric dovetail (as opposed to a one-off), add an
+explicit **symmetry constraint** about a construction centerline plus named `dovetail_length`,
+`dovetail_angle` (degrees), and `dovetail_quantity` (unitless) parameters -- this is what lets the
+joint correctly resize and re-count tails when stock or drawer dimensions change (watch for the
+"pattern quantity silently pinned to a literal instead of the parameter" failure mode in
+gotchas.md). Cut the socket with `Extrude > Cut > Extent: Object` targeting the actual far
+reference face (e.g. a back panel) rather than a fixed distance, so the cut always reaches the
+correct depth even as the model resizes. Blind vs. through dovetails are just a Press/Pull offset
+(recess) applied to the show-face -- same underlying sketch/cut logic either way. Pattern the *cut
+feature* (not just its source sketch geometry) up a board's height using Pattern on a Path with a
+symmetric direction and a spacing expression that centers the tails (e.g.
+`(drawer_height/2) - dovetail_length`).
+
+## 88. Mortise & tenon / dado / rabbet via the Combine "virtual router" technique
+
+See entry 81 for the mechanics. Applied specifically: cut a **dado** (shelf-support groove) into a
+side panel's inner face via its own sketch+cut-extrude on that face (does not need a mating "tool"
+body -- it's a direct dimensioned cut, sized from the shelf-stock-thickness parameter). Cut a
+**mortise** by first modeling the tenon on the mating board, then Combine > Cut (Keep Tools)
+against the mortised board using the tenon board as the tool -- this is preferred over separately
+dimensioning the mortise because it can't produce a fit mismatch. A **rabbet for a back panel**
+recesses the back panel's edges via Offset Faces (negative offset, e.g. `2 * joinery`), then
+Combine > Cut (Keep Tools) against every case part the back touches in one operation, so all
+rabbets update together if stock thickness changes. **Half-lap**: extrude the first board, sketch a
+rectangle over the overlap region on the mating face, extrude-cut to `-stock_thickness/2`.
+**Miter**: extrude the board to length, then sketch a single angled line (typed angle, e.g. 135
+degrees) on the end face and extrude-cut through. Compute joinery offsets as typed fractional
+expressions of a thickness parameter (e.g. `stock_thickness/3`, then `/2`) rather than pre-computed
+decimals, so the *intent* of the ratio stays visible and adjustable -- several sources instead type
+one-off decimal literals (e.g. `0.375/2` inline) which works once but silently stops tracking the
+thickness parameter if it later changes.
+
+## 89. Drawer construction (front-to-opening constraint technique)
+
+The most robust drawer-front technique in the corpus: sketch the front on its own (front) plane,
+oversized, then constrain its four edges **collinear** to the four edges of the cabinet opening it
+sits in -- the front then auto-resizes whenever the opening resizes, with zero manual dimension
+entry. Add clearance (e.g. a 0.5 mm reveal gap) afterward via Offset Faces on the already-
+constrained panel; because the offset is relative to the constrained opening, the clearance itself
+survives later resizing. Build the remaining sides/back the same way, against the now-placed front,
+rather than mirroring/copy-pasting a "near enough" symmetric part (one source deliberately avoids
+copy-paste here because of observed constraint-tracking unreliability on multi-axis resizes --
+noted as a workaround for an underlying fragility, not a real fix, so treat any copied "symmetric"
+drawer part as needing a manual double-check rather than assumed-correct). Drawer bottom: extrude
+the base panel taller than needed above a floor reference, then Offset Faces to shrink it back to
+true thickness -- a way to get a captured/floating panel at a controlled offset without extra
+construction geometry. Rebate the bottom into the sides using the same Combine cut-router technique
+as entry 88, sized from the `joinery` parameter. To replicate an entire finished drawer at a new
+size: Copy/Paste the top-level drawer component, then a single Joint operation both positions it
+(matching reference edge midpoints) and sets its sliding motion.
+
+## 90. Raised panel door (cope-and-stick modeling)
+
+Model the actual stile/rail/panel joinery geometry (not a flat proxy board) so the CAD model
+doubles as the real shop cut-list/dimension source. Drive stile/rail width from a named parameter;
+derive the door-to-carcass overlay/reveal gap from a formula (e.g. `stock_thickness/2 - desired_gap`)
+so the reveal stays consistent as stock thickness changes -- watch for radius-vs-diameter confusion
+when writing this kind of formula (see gotchas.md). Model the cope profile (a round-over + step) as
+a small end-grain sketch, then Sweep it the length of the stile/rail, with profile dimensions
+expressed off the `joinery` parameter rather than fixed numbers. Constrain a center rail to the
+midpoint between stiles with a midpoint constraint so it stays centered through any resize. Model
+the raised-panel bevel as its own swept profile (fit-point splines constrained parallel to
+reference edges), swept around the panel perimeter -- this mirrors how a router bit actually cuts a
+raised panel, rather than approximating it with a simple chamfer. Use sketch Fillet on the profile
+to represent the radius a router bit leaves. Assemble the door from individually glued (rigid,
+as-built joint) parts as its own sub-assembly component, then Mirror the whole sub-assembly around
+a midpoint plane to generate the opposite door rather than modeling it twice.
+
+## 91. Joints (assembly "glue") and motion for drawers/doors
+
+Two distinct glue mechanisms: an **As-Built Joint** glues components that are already correctly
+positioned in place (used when parts were built in-place from a shared origin/reference); a plain
+**Joint** both moves a component into position *and* glues it in a single step (used for copied/
+externally-positioned geometry). Use **Rigid** motion for a simple zero-degrees-of-freedom glue
+between static parts. Mark one component **Ground** (right-click > Ground) to fix a stationary
+reference part before building relative motion off it. **Slider** joints model drawer/door travel
+along one axis -- use the joint dialog's **Animate** preview to check the travel direction before
+committing, rather than guessing (trial-and-error axis-cycling is called out as a recurring
+inefficiency in gotchas.md). Nothing in an assembly is glued by default, even when every part is
+geometrically correct -- components can be freely (and accidentally) dragged apart until a joint is
+explicitly added; assembly integrity is entirely opt-in. When you drag a component just to inspect
+it, use **Position > Revert** to restore its true modeled position rather than accepting a "capture
+position" prompt, which would silently bake the inspection drag in as the new real position.
+
+## 92. Exploded views & posed views via the Animation workspace
+
+Build exploded or otherwise "posed" views (door open, drawer pulled out) in the **Animation**
+workspace, not by dragging components around in the normal design timeline -- moving parts in
+design mode permanently alters the base model. Drag each component's transform handles manually
+rather than relying on Fusion's "Auto Explode," which two independent sources in the corpus both
+found produces a poor/unusable starting arrangement on its own. For a rotated pose (e.g. a door
+swung open), explicitly relocate the Transform pivot point to the hinge-side corner before rotating
+-- the default pivot is the component's centroid, which produces the wrong rotation. Name each
+saved animation storyboard descriptively (e.g. "Exploded View," "Open Door") so it can be selected
+later. A drawing's Base View has a **Representation** option that can reference a saved storyboard
+directly, letting a non-default posed state (exploded, door-open) be placed straight into a plan
+sheet instead of the plain model. After editing a storyboard, save the design -- any drawing built
+from it shows an "out of date" marker until its refresh/update icon is clicked (a staleness trap
+noted independently by two sources; see gotchas.md).
+
+## 93. Materials: physical vs. appearance
+
+Fusion separates two independent material concepts: **Physical Material** (mass/density/structural
+properties, what a generated cut-list/BOM reports) and **Appearance** (the visual texture used only
+for rendering) -- set both deliberately and independently; assigning one does not set the other.
+Default physical material is generic steel and must be manually assigned (e.g. drag a wood species
+from the material library onto each component) or a generated cut-list's mass/density figures will
+be wrong (and, worse, a rendered part with only an Appearance set but no Physical Material assigned
+can show a misleading material like "Steel" in an auto-generated parts table -- don't trust a BOM's
+material column unless physical materials were explicitly applied to every part). Assigning
+material to a shared/copied component (rather than a unique one) affects every instance at once,
+another consequence of the body/component/copy distinctions in entry 85.
+
+## 94. Rendering workflow
+
+Use the dedicated **Render** workspace (separate from Design); recommended order: assign Appearance
+materials -> fix per-component grain orientation and vary knot/grain patterns via **Texture Map
+Controls** (Box projection) -> configure **Scene Settings** (environment/lighting, ground plane,
+camera) -> run a fast in-canvas preview render to iterate -> commit to a final high-quality render.
+Automatic texture mapping frequently gets wood-grain direction wrong (e.g. grain running vertically
+on a side panel) and needs a manual per-component correction pass every time -- budget for this as
+a deliberate QA step, not a one-time setup. Deliberately vary grain/knot placement across adjacent
+same-material parts (via the same Texture Map Controls) so they don't read as an obviously repeated
+texture tile. Useful scene settings: environment/background library (a soft studio preset works
+well for product-style shots), ground plane presence/reflections/offset, perspective vs.
+orthographic camera (perspective generally reads as more realistic), focal length, exposure, and an
+aspect ratio matched to the intended output (e.g. 16:9 for video). Design and Render workspaces
+share live model state -- a drawer position or material swap made in one shows up in the other.
+Cloud rendering (paid credits) produces a rotatable turntable result with post-processing options;
+local rendering is free but slower and produces only a static 2D image with no post-processing --
+budget real time for local high-quality stills (on the order of tens of minutes each in the source
+material) and plan/batch appearance and scene changes rather than iterating render-by-render.
+Because rendered stills stay tied to the live parametric model, presenting material options (e.g.
+alternate wood species) to a client can be done by re-rendering the same model with a swapped
+Appearance rather than duplicating files.
+
+## 95. Drawings, cut-lists / BOM, title blocks
+
+Drawings are a separate, dynamically-linked document (Design workspace dropdown > New Drawing, or
+right-click a component > Create Drawing), not a tab inside the model file. Before generating a
+drawing, reorganize the component tree into sub-assemblies that mirror the real build sequence
+(Carcass, Doors, Drawers, Hardware) -- this structure maps directly onto BOM table groupings and
+callout/part-number numbering later. Use **Remove** (not **Delete**) to clear an empty/unwanted
+grouping node in the tree -- Remove un-nests its children safely, while Delete cascades and can
+strip components still referenced elsewhere out of the timeline entirely. Drawing view types:
+**Base** (the first view placed), **Projected** (ortho/iso views that stay aligned to a parent
+view -- use this for elevations that must track a base view), a fresh **Base View** again for an
+independently repositionable view (e.g. an alternate rotated orientation), **Section**, and
+**Detail** (a circled, scaled zoom callout of one area, e.g. a joint). Display style "visible edges
+only" (no shading), with tangent edges optionally enabled to show curved-profile transitions (e.g.
+a raised-panel bevel), reads as a clean shop drawing style. Set global dimension precision in
+Document Settings *before* dimensioning -- it only applies going forward, not retroactively.
+Right-click > Edit Title Block to strip unused default fields and keep only what's needed (doc
+name, date, created-by); save the result as a reusable custom template. The **Table** command
+auto-generates a BOM (item #, quantity, part number, description, material, mass -- fields
+individually toggleable) linked to numbered balloon callouts on the view; a balloon's arrow can be
+dragged onto different geometry to re-associate/renumber it. Turn off the Material/Description
+columns in the table dialog when material was only ever assigned for rendering Appearance, not
+Physical Material -- otherwise the table can report a misleading material like "Steel" for a wood
+part. Export a BOM table to CSV; export drawing sheets to PDF/DWG/DXF. Manually-entered component
+metadata (part number, description text) does **not** auto-update on a model resize or tree
+reorder -- only the component *name* propagates automatically; a generated BOM/drawing needs a
+manual re-audit pass before it's treated as final, especially on a project whose overall dimensions
+get changed after the metadata was first typed in.

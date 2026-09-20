@@ -2040,3 +2040,197 @@ script, so the entire correct rebuild was discarded for a typo in a status line.
 Compute expensive geometry first, assert on it, and keep the reporting to plain `%s` and single-value
 `%f` until the script has proven itself. Anything clever in a `print` is a rollback risk out of all
 proportion to its value.
+
+## Extrude silently defaults to Join and merges parts that only touch (2026-09-20)
+
+Whenever a new extrude profile touches or overlaps existing solid geometry, Fusion's Operation
+dropdown defaults to **Join** rather than New Body/New Component. In a woodworking model this
+routinely and silently fuses two physically separate parts (e.g. two side panels extruded in one
+operation) into a single component with a meaningless combined bounding box. This is the single
+most-repeated specific mistake across the whole reviewed tutorial corpus -- flagged independently
+in nearly every multi-part build video, and even self-flagged on camera by one instructor ("Fusion
+doesn't really care about woodwork... it just makes some choices that are right for the majority,
+not necessarily right for you"). Fix: check the Operation dropdown on every single extrude that
+touches other geometry, not just the ones that look ambiguous; default to New Component for
+anything meant to be an independent real-world part.
+
+## Fillet and Chamfer only blend/chain within one body -- cross-body edges need Combine first (2026-09-20)
+
+A Fillet or Chamfer across an edge shared by two touching-but-separate bodies/components will only
+affect one side (or produce a visually broken result) because these tools treat each body's edges
+independently. If a continuous blended fillet or chamfer across a shared seam is wanted (e.g. a
+rounded transition between an apron and a leg), Join the bodies with Combine first, then fillet/
+chamfer the resulting single-body edge.
+
+## Combine's "Keep Tools" checkbox is off by default and easy to forget (2026-09-20)
+
+Running Combine > Cut without checking "Keep Tools" deletes the tool body after the operation
+completes. In the standard woodworking "model the tenon, then cut the mortise from it" workflow
+(patterns.md #81/#88), forgetting this checkbox deletes the tenon board itself along with cutting
+the mortise -- an easy, silent, and (without undo) destructive mistake. Check "Keep Tools"
+deliberately on essentially every woodworking Combine > Cut.
+
+## Deleting a construction plane breaks every mirror/feature anchored to it (2026-09-20)
+
+Cited independently at least four times across different sources in the reviewed corpus, including
+one instructor explicitly admitting he's "made this mistake a couple of times": deleting a
+construction plane that a Mirror (or other derived feature) depends on breaks the parametric
+reference silently, typically producing a failed/dangling feature on the next rebuild rather than
+an immediate obvious error. Treat construction planes that any mirror or other feature references
+as permanent model infrastructure -- hide them if the tree looks cluttered, never delete them.
+
+## Mirrored components can fragment BOM/parts-table quantity counts (2026-09-20)
+
+One source in the reviewed corpus found that Mirror-duplicated components appear as separate line
+items in an auto-generated drawing parts table (often suffixed "(Mirror)") rather than rolling up
+into "quantity 2" of the shared source component, because table roll-up matches by component name/
+identity and a mirrored instance doesn't share it. The same source states he "should have just
+copied them" instead. A second source uses Mirror on BOM-scheduled parts (roof rafters) without
+checking whether the same fragmentation occurs -- this is a known risk, not confirmed universal
+behavior, so if a drawing's BOM must report accurate quantities, verify how mirrored parts actually
+roll up in that specific table rather than assuming, and prefer Copy over Mirror for schedule-
+sensitive parts when in doubt.
+
+## Body vs. component confusion breaks BOM scheduling and edit-propagating duplication (2026-09-20)
+
+Plain bodies (as opposed to components) don't schedule correctly in a drawing's parts-list/BOM
+table, and duplicating geometry as bodies (rather than component instances) means editing one copy
+does not update the others the way editing a component instance would. One source that otherwise
+demonstrates a genuinely parameter-driven drawer-count/height formula explicitly admits mid-video
+that he doesn't understand the body/component distinction or whether it matters for his model --
+a real methodological gap worth checking for in any "parametric" design that hasn't deliberately
+addressed this distinction. See patterns.md #85.
+
+## Manually-entered part metadata does not auto-update on resize or tree reorganization (2026-09-20)
+
+Only a component's *name* propagates automatically through the model. Manually-typed part numbers
+(tied to tree position/hierarchy) and description text (e.g. "42 x 29" dimensions typed once) go
+stale silently after the model is resized or the component tree is reorganized -- neither is
+recomputed automatically. Given how often a parametric woodworking model gets resized during
+design iteration, any generated BOM or drawing needs a manual metadata re-audit pass before being
+treated as final, not just a visual check that the geometry looks right.
+
+## Hand-typed literal dimensions de-parameterize a feature even inside an otherwise parametric model (2026-09-20)
+
+Typing a literal number directly into a dimension or extrude-distance field (instead of a parameter
+name or expression) detaches that one feature from the parametric system even when every other
+dimension around it is parameter-driven -- the model will look and behave as fully parametric until
+that specific feature is the one that needed to change. This was observed repeatedly across the
+corpus even in projects that otherwise take parametrization seriously (a raised-panel corner-curve
+radius set to a bare literal "20" is one specific example; a hardcoded absolute cut distance
+another). Audit dimension fields for stray literals specifically, since a quick visual check of the
+model won't reveal them.
+
+## A parametrically-driven feature can silently revert to a hardcoded literal after being re-edited (2026-09-20)
+
+In one source, a dovetail-count pattern was originally tied to a `dovetail_quantity` parameter but
+stopped updating when the parameter changed; investigating found the pattern's quantity field had
+been left at a literal 5 rather than the parameter reference, requiring the instructor to re-open
+and re-fix the feature by hand ("I don't know why this doesn't work" was the on-camera reaction
+before finding it). Treat "the model isn't updating after a parameter change" as reason to check
+the specific feature's own input fields for a silently-reverted literal, not just to assume the
+parameter itself is wrong.
+
+## Pattern spacing is measured center-to-center, not edge-to-edge (2026-09-20)
+
+A Rectangular Pattern's spacing/distance value is measured between the centers of the first and
+last instance, not from the outer edges of the pattern's footprint. A naive `count * spacing`
+formula for total occupied width will overshoot; correct for this with explicit half-width offset
+arithmetic in the driving parameter/expression, confirmed as a gotcha independently in more than
+one source.
+
+## A Mirror applied to a Pattern is not parametrically linked back to it (2026-09-20)
+
+Mirroring an already-patterned set of features does not keep the mirrored copy synchronized with
+later edits to the original pattern's parameters. The workaround demonstrated: create a second,
+independent Rectangular Pattern that explicitly references the *same* underlying dimension ID as
+the first (e.g. by grabbing the first pattern's dimension ID, such as `D102`, and typing it into
+the second pattern's spacing field) so both patterns move together under future parameter changes,
+rather than relying on Mirror to keep them in sync.
+
+## Sign and anchor-direction errors in hand-built parametric height/offset formulas (2026-09-20)
+
+One source explicitly warns that a derived-height formula's sign (add vs. subtract) can flip
+depending on which direction the model's anchor/axis runs, and that the formula "may need to start
+with a negative total height and add rather than subtract" depending on setup -- i.e. a hand-built
+parametric formula's correctness is not just about getting the right terms, but getting their sign
+right relative to the specific sketch's anchor convention, and this should be explicitly checked
+(e.g. by testing a parameter change and confirming the model grows in the intended direction) rather
+than assumed from the formula's algebra alone.
+
+## Radius-vs-diameter and similar unit-role mixups in derived expressions (2026-09-20)
+
+While building a raised-panel-door reveal formula, one source live-caught a mixup where a parameter
+named `joinery` (defined as a radius-scale value) was used in a spot that geometrically needed a
+diameter, introducing a silent 2x dimensional error until caught and corrected on camera. Review
+any formula that mixes multiple named parameters against what each one actually represents
+geometrically (radius vs. diameter, half-width vs. full-width), not just whether the formula
+"looks visually correct" on the current model state -- a 2x error like this can be invisible unless
+the affected feature happens to be checked at a size where it's obviously wrong.
+
+## Angle-derived dimensions can diverge from their nominal value and break cut-list grouping (2026-09-20)
+
+Trig-derived dimensions on angled/compound geometry can come out numerically close-but-not-exactly
+equal to their intended nominal value (e.g. 0.749" instead of a clean 0.75"), which is invisible in
+normal use but can break a downstream tool that groups cut-list entries by exact identical size.
+The workaround shown was a trivial small forced join-extrude to normalize the dimension to a
+consistent referenced thickness. Worth checking when feeding angled-geometry parts into any
+external nesting/cut-list tool that groups by exact dimension match.
+
+## Deleting an empty sub-assembly node with "Delete" cascades and removes referenced components -- use "Remove" instead (2026-09-20)
+
+In the component browser tree, "Delete" on an empty or unwanted sub-assembly grouping cascades and
+strips out components that are still referenced elsewhere (e.g. still used by the timeline),
+whereas "Remove" safely un-nests the grouping's children without touching the underlying
+components. This is a real, easy-to-trigger footgun during routine tree cleanup, not an edge case.
+
+## Auto Explode produces a poor starting arrangement -- build exploded views by hand (2026-09-20)
+
+Two independent sources in the reviewed corpus both separately concluded that Fusion's "Auto
+Explode" feature gives an unusable or poor-quality result on their models and switched to manually
+dragging each component's transform handles in the Animation workspace instead. Treat Auto Explode
+as, at best, a rough starting point to manually clean up, never a finished result.
+
+## A drawing linked to the design goes silently stale after a model change (2026-09-20)
+
+After editing the source model (including an Animation storyboard used for a posed/exploded drawing
+view), any drawing sheet built from it keeps showing the old geometry until its update/refresh
+("out of date," yellow marker) icon is manually clicked -- there's no automatic re-sync. Noted
+independently by more than one source as an easy step to forget, especially right before exporting
+or sharing a drawing.
+
+## Wood-grain texture-map orientation defaults are usually wrong and need a manual per-component fix before rendering (2026-09-20)
+
+Fusion's automatic texture mapping frequently orients wood-grain the wrong way (e.g. grain running
+vertically on what should be a horizontal-grain side panel), and this is not a one-time setup --
+each component needs Texture Map Controls (Box projection) checked and corrected individually, and
+adjacent same-material parts should be deliberately varied (not left visually identical) or the
+render reads as an obviously repeated texture tile. Treat this as a mandatory QA pass before a
+final render, not an optional polish step.
+
+## Joint sliding/rotation axis is easy to get wrong by trial and error instead of reasoning from the sketch (2026-09-20)
+
+Across several sources, the axis for a Slider or rotational Joint (drawer travel direction, door
+swing axis) is chosen by cycling through x/y/z options and watching the Animate preview rather than
+reasoned out from how the underlying sketch/component axes are actually defined. This works but is
+inefficient and non-reproducible; where the geometry's intended axis is known in advance, set it
+directly rather than trial-and-error cycling.
+
+## Underdefined (blue) sketch geometry left unconstrained mid-workflow is fragile (2026-09-20)
+
+Several sources routinely rough in a sketch shape first (an arbitrary, unconstrained dovetail or
+joint profile, shown blue) and only constrain it fully afterward, sometimes several steps later.
+This is fine as a demonstration pace but leaves a real window where the geometry can be
+accidentally dragged out of place before it's constrained -- fully constrain a sketch (or at least
+lock down anything that later features will depend on) before moving on to the next feature in a
+real project, rather than leaving it for "later."
+
+## Renaming/labeling mistakes increase the risk of operating on the wrong part in a cluttered tree (2026-09-20)
+
+At least one source mislabels a component (a "small drawer side left" that was actually the right
+side) and catches it only later; the same source separately notes needing to rename things
+"because the convention was getting a bit messy." In a tree with many visually-similar copied/
+mirrored parts (which is the norm in furniture modeling -- lots of near-identical panels and
+drawer parts), a lazy or inconsistent naming convention meaningfully raises the odds of selecting
+the wrong part for a Combine, Joint, or pattern operation. Name parts accurately and consistently
+as they're created, not retroactively once the tree already feels cluttered.
