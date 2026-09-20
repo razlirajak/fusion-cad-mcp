@@ -2234,3 +2234,184 @@ mirrored parts (which is the norm in furniture modeling -- lots of near-identica
 drawer parts), a lazy or inconsistent naming convention meaningfully raises the odds of selecting
 the wrong part for a Combine, Joint, or pattern operation. Name parts accurately and consistently
 as they're created, not retroactively once the tree already feels cluttered.
+
+## Sketch snapping silently fails without "Auto Project Edges on Reference" enabled (2026-09-20)
+
+At least 14 independent commenters across four different videos hit the exact same symptom:
+starting a sketch near existing geometry gives no snap/inference cue on nearby vertices or
+midpoints. The cause is a Preferences setting (General > Design > "Auto Project Edges on
+Reference," worded slightly differently across versions) that is not enabled by default in the
+versions these videos were made on. Check this setting before assuming a snapping failure means
+something is wrong with the geometry itself.
+
+## Recreating or replacing a component can silently orphan a sketch elsewhere in the model (2026-09-20)
+
+Confirmed independently by 5+ commenters across two different lessons: rebuilding or replacing one
+component (e.g. splitting a merged part into separate real components, per patterns.md #85) can
+break a *different* sketch elsewhere that used the original component's face as its sketch plane --
+the affected sketch shows a yellow warning and its downstream part silently stops tracking its
+driving parameter. Fix: right-click the broken sketch > "Redefine sketch plane," re-pick the
+correct current face. This is the general form of the construction-plane-deletion gotcha already
+documented -- any component recreation/replacement, not only deleting a construction plane, can
+orphan a reference somewhere else in the tree, and the breakage doesn't show up at the point where
+the change was made.
+
+## Mirror/Pattern instances remain geometrically linked to their source, with no built-in "make unique" (2026-09-20)
+
+An edit or joinery cut applied to one Mirror or Pattern instance applies to every instance sharing
+that source, because they remain genuinely linked geometry, not independent copies -- this is a
+modeling constraint, not just the already-documented BOM-counting quirk. If two parts only *look*
+symmetric but actually need independent asymmetric details (an offset dado, an off-center hole),
+Mirror/Pattern is the wrong tool. The reported workaround, "Paste New" to decouple a copy from its
+source, only works cleanly if done before any other feature references the shared geometry --
+retrofitting independence later is reported as painful. Decide whether two parts are genuinely
+symmetric before choosing Mirror/Pattern over modeling them separately.
+
+## Rectangular Pattern's "Start Point" field can silently default to a stray non-zero value (2026-09-20)
+
+Reported cause of a pattern's last instance landing out of alignment by roughly half a stock
+thickness: the pattern dialog's Start Point field defaulting to something like 0.004 instead of a
+clean 0.00. Check/reset this field to 0 explicitly rather than assuming it starts there. Separately,
+the pattern dialog's "Suppression" option must be enabled to get per-instance checkboxes for
+deselecting individual copies -- more than one commenter got stuck looking for this.
+
+## Component Appearance/grain is shared across every instance of the same component definition (2026-09-20)
+
+Changing the wood-grain Appearance on one instance of a repeated component (e.g. one copy of a
+duplicated drawer sub-assembly) changes it on every other instance sharing that component
+definition at once, the same way assigning Physical Material to a shared/copied component affects
+every instance (patterns.md #93) -- because instances of the same component definition share it.
+To vary grain/appearance per-instance, the instance needs to be made a unique component first (see
+the Mirror/Pattern-linkage gotcha above for why that's not always straightforward to do after the
+fact).
+
+## Reorganizing the component browser tree can silently break existing joints (2026-09-20)
+
+One reported case: moving components into new folders/sub-assembly groupings after Joints (see
+patterns.md #91) were already set up caused drawer sliding joints to stop functioning, with no
+obvious error pointing at the reorganization as the cause. Treat tree reorganization as a
+non-trivial operation once joints exist, and verify joint/animation behavior afterward rather than
+assuming a pure organizational change is safe.
+
+## A regenerated parts table can silently drop the "(Mirror)" suffix from a mirrored component's description (2026-09-20)
+
+One reported case: after editing an exploded view and regenerating the drawing's parts table, a
+mirrored component's description lost its "(Mirror)" marker -- a concrete new failure mode on top
+of the already-documented mirrored-component BOM fragmentation (gotchas.md, mirrored components
+fragment BOM/quantity counts). Re-check mirrored-part descriptions in a parts table after any
+regeneration, not just after the initial generation.
+
+## Fusion does not deduplicate independently-modeled parts that happen to match in a parts table (2026-09-20)
+
+Matching dimensions and material alone does not make Fusion treat two separately-built components
+as "the same part" for BOM/quantity-counting purposes -- correct quantity counting requires true
+copies or patterns descended from one source component, not parts that were separately modeled to
+the same spec. Combined with the cut-list-values-aren't-live-linked gotcha below, this means a
+generated parts list needs real scrutiny, not a glance, before it's trusted for shop use.
+
+## Cut-list/BOM dimension values are not live-linked to the model -- confirmed independently by multiple viewers (2026-09-20)
+
+The standard workaround reported across more than one video: manually measure each part with
+Inspect and type the value into the component's name/description by hand. This is redundant,
+error-prone, and -- because it's manual -- has to be redone after every parameter change, since
+nothing flags a now-stale typed value as wrong. This directly reinforces and sharpens the
+already-documented "manually-entered part metadata does not auto-update on resize" gotcha: it's not
+just that metadata can go stale, it's that there is no available live-linked alternative in the
+base tool for cut-list dimensions specifically, so a generated cut list needs a full manual
+re-verification pass before it goes to the shop, every time.
+
+## Exploded views require true components, not bodies or ad-hoc copies (2026-09-20)
+
+Auto Explode and manual exploding (Animation workspace, patterns.md #92) only work on real
+components -- a design still using undivided bodies can't be exploded until it's actually split into
+components. Separately, a plain "copy" of a component (as opposed to a real pattern/mirror instance)
+only shows the original in an exploded view, not the copy -- another reason (beyond BOM counting) to
+prefer genuine component instances over manually duplicated geometry for anything that will need an
+exploded view or a drawing.
+
+## Fusion drawings only place accurate dimensions on orthographic views, not isometric/exploded views (2026-09-20)
+
+A well-corroborated, long-standing limitation per the reviewed comments: dimensions added to an
+isometric or exploded drawing view read incorrectly, and only top/front/side (orthographic)
+views support correct dimensioning. Plan a drawing sheet's dimensioned views as orthographic from
+the start; use an isometric/exploded view for visual clarity only, never for a dimension a builder
+will actually cut to.
+
+## Personal/hobbyist license has real export and workflow limits since a 2020 tier change (2026-09-20)
+
+Repeatedly confirmed across 5+ videos' comments: the free hobbyist tier no longer exports
+multi-sheet drawings, PDF, DXF, STEP, IGES, or SAT; cloud rendering and "Quick Add" to drawing
+sheets are gone; active documents are capped at 10. Reported workarounds: OS-level "print to PDF"
+(reliable on Mac) or a screenshot tool for getting a drawing sheet to PDF, and creating new drawing
+sheets manually instead of via the removed Quick Add. Worth checking Fusion's current licensing
+terms directly before planning a workflow that assumes any of these are available on a free account.
+
+## A hobbyist license can be revoked if the account is used to design items that are then sold (2026-09-20)
+
+Multiple commenters warn that Autodesk can remotely revoke a personal/hobbyist license's file
+access if it determines designs made under it are being sold. If a project is ever likely to be
+sold rather than kept personal, the reported fix is switching to the free small-business license
+tier (reported approval turnaround: about a day) rather than risking the hobbyist account.
+
+## Join-mode extrude merges with ANY touching/connected body, not just the one intended (2026-09-20)
+
+An experienced-user comment reinforces and sharpens the already-documented Extrude-defaults-to-Join
+gotcha: Join doesn't merge only with the specific face/edge that was meant to be extended -- it
+merges with any body it happens to touch or connect to, which can silently pull in an unrelated
+part. Also reported: Extrude frequently defaults to the *negative* direction, requiring a manual
+sign flip to get the intended direction; and a component's local X/Y/Z axes often don't point the
+way a modeler expects when picking an axis for a Joint (reinforcing the already-documented
+trial-and-error joint-axis gotcha) -- check the local axis orientation explicitly rather than
+assuming it matches the world axes.
+
+## A part-design-mode project always merges new geometry into one body regardless of the Join/Cut/New Body choice (2026-09-20)
+
+One commenter flags a project-level setting trap: unless a project/document is started in
+"hybrid" mode, standard "part design" mode will merge all new extruded geometry into a single body
+no matter what's selected in the Extrude operation dropdown. If separate bodies/components aren't
+resulting despite explicitly choosing New Body/New Component, check which design mode the document
+is in before troubleshooting the individual feature.
+
+## A spline's Equal constraint only equalizes control-line lengths, not their angle -- can silently break sweep symmetry (2026-09-20)
+
+Reported cause of a swept profile (e.g. crown moulding) that visually "stops halfway" or shows a
+discontinuity at its centerline: the Equal constraint used to make two halves of a profile spline
+match only equalizes their line lengths, not the angle each makes, so the result can be subtly
+asymmetric even though it looks constrained/correct in the sketch. Reported workaround: draw one
+half of the profile, trim it to the centerline, then Mirror it, rather than relying on Equal alone
+for a symmetric sweep profile.
+
+## A bounding box on a swept/curved body measures along the curve, not the straight-line span (2026-09-20)
+
+A reported case: a swept crown-moulding body's bounding-box length read far larger than the actual
+straight-line span of the piece it was mounted to. Suspected cause: the bounding box follows the
+curved sweep path rather than measuring the linear extent. Don't trust a bounding-box dimension at
+face value on any swept or otherwise curved body -- verify against a known reference dimension
+first, consistent with the general "bounding box sanity check" habit in patterns.md #12.
+
+## Rectangular-patterned instances stay linked as one feature -- a single instance can't be edited or removed independently (2026-09-20)
+
+Reported for a row of pattern-generated wall studs: trying to edit one instance (e.g. to cut a
+window opening in one stud) or delete a single instance affects the whole pattern feature at once,
+with no obvious way to break one instance out on its own. If an individual instance in a pattern
+will eventually need independent treatment, plan for that before patterning (e.g. exclude that
+position from the pattern and model it separately from the start) rather than expecting to peel one
+out later.
+
+## A missing Coincident constraint, not just a hardcoded literal, is a confirmed real cause of "resizing breaks the model" (2026-09-20)
+
+A commenter diagnosed a specific case of a parametric model breaking on resize (a top panel that
+stopped tracking an overall height parameter) back to a sketch edge that was never actually made
+Coincident with the panel it needed to track, even though the two looked aligned in the sketch. This
+is a concrete, diagnosed instance of the general "Fusion doesn't auto-weld touching geometry"
+gotcha already documented (patterns.md #84) -- when a resize breaks something that looks like it
+should have tracked correctly, check for a missing Coincident constraint before assuming the
+formula/parameter itself is wrong.
+
+## Fusion's default up-axis convention has changed over time (X-up to Z-up) (2026-09-20)
+
+One commenter notes Fusion's default up-axis has changed since some of these (several-years-old)
+tutorials were made, now defaulting to Z-up (the current industry-standard default) rather than
+X-up. A model built by following an older tutorial's on-screen axis orientation may not match a
+current install's default -- the convention is changeable in Preferences if a specific orientation
+is needed to match older material.

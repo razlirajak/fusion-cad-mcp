@@ -117,6 +117,17 @@ Internal units are cm. `ValueInput.createByString('30 mm')` accepts unit suffixe
 94. Rendering workflow
 95. Drawings, cut-lists / BOM, title blocks
 
+### Comment-section review addendum (2026-09-20)
+
+96. Comment-section review (2026-09-20): what viewer feedback added beyond the video content
+97. Enable "Auto Project Edges on Reference" or sketch snapping silently fails
+98. Extrude "To Object" for any cut/groove/dado that must track other geometry
+99. Build order: create the component first, then sketch inside it
+100. Fix for an orphaned sketch reference after a component is recreated or replaced
+101. Mirrored/patterned instances stay geometrically linked to their source -- there is no built-in "make unique"
+102. Inline parameter creation: type name=value directly into a dimension field
+103. Real-world buildability and licensing caveats worth checking before relying on this corpus
+
 ## 1. Idempotent user-parameter add
 
 Make every script safe to re-run.
@@ -2881,3 +2892,105 @@ metadata (part number, description text) does **not** auto-update on a model res
 reorder -- only the component *name* propagates automatically; a generated BOM/drawing needs a
 manual re-audit pass before it's treated as final, especially on a project whose overall dimensions
 get changed after the metadata was first typed in.
+
+## 96. Comment-section review (2026-09-20): what viewer feedback added beyond the video content
+
+A second pass was done over the YouTube comment sections of the same 40 videos (not the videos
+themselves), specifically looking for viewer-reported problems, corrections, and points of
+confusion the tutorials' own narration didn't surface. Comments are much noisier than the videos
+(the large majority are praise/thanks/off-topic), so only independently-corroborated or clearly
+diagnostic findings were kept -- entries below are tagged with how many independent commenters
+raised the same point where that's notable, since repetition across strangers is a stronger signal
+than a single opinion. Entries 97-103 are the resulting patterns; the corresponding gotchas were
+added to gotchas.md as dated 2026-09-20 entries.
+
+The single most-repeated point of confusion across nearly the entire comment corpus, by a wide
+margin (10+ independent commenters across at least 5 different videos), is "what's the actual
+difference between a body and a component, and when do I use which" -- reinforcing patterns.md #85,
+and suggesting that distinction deserves extra care/explicit checking in any future work, not just
+a one-time read.
+
+## 97. Enable "Auto Project Edges on Reference" or sketch snapping silently fails
+
+At least 14 independent viewers across four different videos in the corpus hit the same problem:
+starting a new sketch near existing geometry, expecting the usual blue snap/inference cues on
+vertices and midpoints, and getting nothing. The fix, confirmed independently multiple times: in
+Preferences > General > Design (worded slightly differently across Fusion versions, e.g. "Auto
+project geometry on active sketch plane"), enable "Auto Project Edges on Reference." Several
+viewers asked pointedly why this isn't the default. Check this setting first whenever sketch
+snapping to existing geometry seems to not be working, before assuming the geometry itself is the
+problem.
+
+## 98. Extrude "To Object" for any cut/groove/dado that must track other geometry
+
+Reinforced independently by several commenters beyond what the video transcripts themselves showed:
+whenever a cut feature (a dado, groove, or rebate) needs to reach a specific reference surface, use
+Extrude's "To Object" extent type (pick the target face) rather than typing a literal distance --
+this is the general form of the tenon/mortise "Extrude to Object" technique in patterns.md #78/#81,
+and viewers specifically flagged it as the fix for cuts that stop being correct once a design is
+resized.
+
+## 99. Build order: create the component first, then sketch inside it
+
+One viewer's recommended sequence -- create the (empty) component first, then sketch and extrude
+inside it -- keeps the sketch correctly owned by and moving with that component from the start.
+The alternative (sketch first, then convert the resulting body to a component) was reported by
+another viewer to cause a component to visually drift out of alignment with the sketch that
+originally defined it once the body is later moved, joined, or has its position captured --
+making later edits confusing and hard to manage. Prefer component-first for any part meant to be
+edited or repositioned later.
+
+## 100. Fix for an orphaned sketch reference after a component is recreated or replaced
+
+Confirmed independently by at least 5 different commenters across two different lessons: rebuilding
+or replacing a component mid-project (e.g. splitting a merged part into separate components, per
+patterns.md #85) can silently break a *different*, dependent sketch elsewhere in the model that
+referenced the original component's face as its sketch plane -- the affected sketch shows a
+yellow/warning indicator and the part built from it stops resizing with its driving parameter. The
+confirmed fix: right-click the errored sketch > "Redefine sketch plane" and re-pick the correct
+(new) face. This restores the parametric link without needing to rebuild the downstream feature
+from scratch. Treat this as the general-case cousin of the construction-plane-deletion gotcha in
+gotchas.md: *any* component recreation/replacement, not just plane deletion, can orphan a reference
+elsewhere in the tree.
+
+## 101. Mirrored/patterned instances stay geometrically linked to their source -- there is no built-in "make unique"
+
+Multiple independent commenters converged on a sharper version of the mirrored-BOM-fragmentation
+gotcha already documented: the deeper issue is that Mirror and Pattern instances remain fully
+geometrically linked to their source, so a joinery cut or edit applied to one instance is applied
+to *all* of them -- this is a real modeling constraint, not just a cosmetic BOM-counting quirk, and
+it means Mirror/Pattern are the wrong tool whenever two "symmetric-looking" parts actually need
+independent asymmetric details (e.g. shelf-pin holes or an offset dado that must NOT mirror).
+Fusion has no direct "make this copy independent" command; the reported workaround is "Paste New"
+to decouple a copy from its source component -- but only cleanly if done *before* any other feature
+starts referencing the shared geometry. Decide up front whether two parts are truly symmetric
+(safe to Mirror/Pattern) or only superficially similar (model them as separate components from the
+start).
+
+## 102. Inline parameter creation: type `name=value` directly into a dimension field
+
+Confirmed by a viewer as a working shortcut: instead of opening Modify > Change Parameters first, a
+brand-new named parameter can be created on the fly by typing `name=value` (e.g. `width=39`)
+directly into any sketch dimension's value field -- Fusion creates the user parameter at that point
+and it's immediately available to reference by name elsewhere. Useful for capturing a dimension as
+a parameter in the moment rather than breaking flow to pre-declare it, though the parameters dialog
+is still the better place to review/rename/document the full parameter set afterward.
+
+## 103. Real-world buildability and licensing caveats worth checking before relying on this corpus
+
+- One standalone shed-framing video was independently flagged by 7+ commenters (several well-liked)
+  as not real-world buildable: stud spacing that doesn't align to standard sheet-good widths,
+  rafters not landing over studs, an undersized header for its span, and missing king studs/doubled
+  top plate -- one viewer states outright "please, no one use this tutorial or design as actual
+  architectural reference." Treat that video (and by extension any single from this corpus that
+  wasn't cross-checked against real building/joinery practice) as a Fusion-UI walkthrough only, not
+  as validated construction guidance -- consistent with the source-quality tiering in #76.
+- Fusion 360's personal/hobbyist license (the free tier) has real functional and legal limits worth
+  knowing before planning shop work around it: since an October 2020 tier change it no longer
+  exports multi-sheet drawings, PDF, DXF, STEP, IGES, or SAT, drops cloud rendering, removes
+  "Quick Add" to drawing sheets, and caps active documents at 10. Reported workarounds: OS-level
+  "print to PDF" for a drawing sheet (reliable on Mac), or a screenshot tool, and creating drawing
+  sheets manually instead of via Quick Add. Separately, multiple commenters warn that Autodesk can
+  remotely revoke a hobbyist license's file access if it determines the account is being used to
+  design items that are then sold -- anyone planning to sell what they build should look at the
+  free small-business license tier instead (reported approval time: about a day).
