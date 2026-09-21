@@ -2506,3 +2506,43 @@ is needed to match older material.
 the commenter's "X-up" as Y up. Current default is **Z up**. The setting is **Preferences > General > Default
 modeling orientation**, it offers Z up or Y up only, it requires a restart, and it applies to new designs rather
 than ones already made. Autodesk staff confirm the change on the forums but publish no version or date for it.
+
+## add_parameters without an explicit `units` field creates unitless params that evaluate to 0 (2026-09-21)
+
+The MCP `add_parameters` tool takes `{name, expression, units?, comment?}`. The `units` field is optional
+and **defaults to empty string**, which creates a UNITLESS parameter. A unitless parameter holding a length
+expression such as `"0.75 in"` resolves to **0**, silently:
+
+- `Parameter.expression` still reads back as `0.75 in` -- looks completely correct.
+- `Parameter.isValid` is **True**.
+- `Parameter.unit` is `''` -- this is the only tell.
+- `Parameter.value` is `0.0`.
+- The MCP's own `list_parameters` reports `"value": 0.0, "units": ""` for every one of them, which is easy
+  to read as a reporting quirk rather than a real failure.
+
+Every downstream dimension binds to the parameter successfully and evaluates to zero, so sketches can fail
+to constrain, profiles collapse, or extrudes build at zero size -- none of which points back at the
+parameter definition.
+
+Caught in the router-table-cabinet build, 2026-09-21: all 15 parameters were created this way and were dead
+on arrival. The model would have built at zero size. It surfaced only because resolved values were checked
+against expected numbers before any geometry was built.
+
+**Fix:** always pass `units` explicitly (`'in'`, `'mm'`, or `''` deliberately for a true count/ratio):
+
+```python
+des.userParameters.add('ply', adsk.core.ValueInput.createByString('0.75 in'), 'in', 'comment')
+```
+
+**Habit:** after creating parameters, assert resolved values against expected numbers before building
+anything on them. Reading `expression` back is NOT sufficient -- it is correct in the failure case.
+
+```python
+um = des.fusionUnitsManager
+for p in des.userParameters:
+    inches = um.convert(p.value, um.internalUnits, 'in')
+    assert abs(inches - expected[p.name]) < 1e-9, (p.name, p.unit, inches)
+```
+
+Note this is the *inverse* of the usual literals problem: the expression is properly parametric and still
+produces the wrong number.

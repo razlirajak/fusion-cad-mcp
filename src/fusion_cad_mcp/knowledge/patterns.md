@@ -128,6 +128,10 @@ Internal units are cm. `ValueInput.createByString('30 mm')` accepts unit suffixe
 102. Inline parameter creation: type name=value directly into a dimension field
 103. Real-world buildability and licensing caveats worth checking before relying on this corpus
 
+### Verified in practice
+
+104. Axis-aligned casework: one sketch plane, offset-start extrudes
+
 ## 1. Idempotent user-parameter add
 
 Make every script safe to re-run.
@@ -3080,3 +3084,50 @@ design agencies, service providers, contract manufacturers, makerspaces and non-
 
 The buildability half of the entry stands unchanged, and generalises: a Fusion tutorial teaches Fusion. It does not
 validate the joinery, structure or engineering of what is being modelled.
+
+## 104. Axis-aligned casework: one sketch plane, offset-start extrudes (verified in practice 2026-09-21)
+
+Every part of a rectangular cabinet carcass is an axis-aligned box. That means **every** part can be built
+from a footprint on the SAME principal plane (xY) extruded along Z, with `OffsetStartDefinition` (section 35)
+placing it at the right height. There is no need to sketch side panels on yZ or a back panel on xZ.
+
+Why this matters: it sidesteps the G5 axis-mapping trap (section 30, sketch X = NEGATIVE world Z on yZ)
+entirely rather than working around it. One mapping, one orientation convention, no per-plane test points.
+
+```python
+def make_part(name, xlo, xhi, ylo, yhi, w_e, d_e, nex_e, ney_e, start_e, dist_e):
+    sk = root.sketches.add(root.xYConstructionPlane)          # ALWAYS xY
+    rect = sk.sketchCurves.sketchLines.addCenterPointRectangle(
+        P((xlo+xhi)/2*IN, (ylo+yhi)/2*IN, 0), P(xhi*IN, yhi*IN, 0))
+    # ... section 2 constraint recipe: horizontal/vertical + 4 dims + G6 re-assign ...
+    ei = root.features.extrudeFeatures.createInput(sk.profiles.item(0),
+        adsk.fusion.FeatureOperations.NewComponentFeatureOperation)   # one component per part, #85
+    ei.startExtent = adsk.fusion.OffsetStartDefinition.create(
+        adsk.core.ValueInput.createByString(start_e))         # z position, parametric
+    ei.setOneSideExtent(
+        adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByString(dist_e)),
+        adsk.fusion.ExtentDirections.PositiveExtentDirection) # thickness
+    feat = root.features.extrudeFeatures.add(ei)
+    b = feat.bodies.item(0); b.name = name; b.parentComponent.name = name
+```
+
+A vertical side panel is just a narrow footprint (`ply` x `cab_d`) extruded the full `cab_h`; a shelf is a
+wide footprint extruded `ply` with a start offset. Same call, different arguments.
+
+**Anchor-corner choice matters.** `addDistanceDimension` is UNSIGNED, so anchor a corner whose coordinate is
+non-zero on both axes, and draw the initial geometry on the correct side so the solver keeps it there.
+Anchoring NE works for parts that start at y=0; for parts on the front face (applied edge banding spanning
+y = -band..0) the NE corner has y=0 and gives a degenerate dimension -- anchor SW instead.
+
+**Verified**: router-table cabinet, 19 components (11 carcass + 8 edge banding), all sketches
+`isFullyConstrained` with every dimension bound to a user parameter, zero typed literals. Parametric cascade
+tested at cab_w/cab_h = 34x32 -> 44x40 -> 26x26 -> 34x32 with no feature errors, and correct behaviour:
+parameter-pinned side bays held at 8 in while the derived centre bay absorbed the width change.
+
+Companion habits that paid off in the same build:
+- Derive opening sizes rather than typing them (`bay_h = (cab_h - 3*ply)/2`). When the derived values matched
+  the source plan's independently-stated dimensions, that was free confirmation the geometry reading was right.
+- Verify with `boundingBox` per part against the source cut list, PLUS gap arithmetic between parts for the
+  clear openings -- catches placement errors that per-part size checks cannot (section 12).
+- The section 20 fit-view block is required here: a script-built model in an unsaved `Untitled` document hits
+  BOTH documented non-auto-fit conditions at once, and named-direction screenshots come back blank.
