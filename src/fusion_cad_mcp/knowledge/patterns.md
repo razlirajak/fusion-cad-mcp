@@ -2527,6 +2527,35 @@ Source-quality varies a lot; weight accordingly:
 - Where two sources conflict (e.g. mirroring vs. copying for BOM-scheduled parts), both sides are
   noted rather than silently picking one.
 
+### Derived artifact and verification status (2026-09-21)
+
+A beginner-facing interactive reference manual -- "Sawdust & Sketches" -- was built from entries 76-103 plus the
+2026-09-20 dated entries in gotchas.md. It reorders the material into a teaching progression (foundations ->
+shaping -> joinery -> duplication -> assembly -> drawings), so **entry numbers do not map onto its chapters**. It is
+a point-in-time distillation with **no live link back to these files**: correcting an entry here does not update the
+manual, which has to be regenerated.
+
+A verification pass was run on 2026-09-21 against current Autodesk help, support and licensing documentation. Nine
+claims in this corpus were found incorrect or mischaracterised and now carry a dated `VERIFIED 2026-09-21:`
+annotation at the end of the affected entry; one uncertain reading is flagged with `NOTE 2026-09-21:` instead of
+being changed. The corrections were also applied to the manual.
+
+**Anything without such an annotation has NOT been re-checked against Autodesk sources and still rests on the
+tutorial corpus alone.** Do not read the presence of a verification pass as meaning the whole file has been
+verified.
+
+Entries annotated: patterns.md #79 (Rule Fillet), #80 (Tangent Chain default), #82 (modelled threads, drill point),
+#87 (dovetail taper ratio -- flagged, uncertain), #92 (drawing-from-animation UI path), #103 (licensing); and in
+gotchas.md the part-design-mode, up-axis, personal-licence export, licence-revocation, mirrored-component BOM,
+regenerated-table suffix, cut-list live-linking and isometric-dimensioning entries.
+
+Confirmed unchanged, recorded so a later pass does not re-litigate them: `atan()` is supported in expression fields
+(unitless in, angle out, displayed in degrees; no `atan2()`); inline parameter creation by typing `name=value` into
+a dimension field works, though per-field coverage is undocumented; the two auto-project preferences keep their
+names and path under Preferences > General > Design, and Autodesk publishes no default state for either; the
+drawing out-of-date marker requires a manual refresh and blocks PDF/DWG export until cleared; only a component's
+name propagates, with Part Number and Description being typed strings.
+
 ## 77. Command reference: Sketch
 
 Three-step workflow: select a construction plane -> draw geometry -> constrain with dimensions.
@@ -2576,6 +2605,13 @@ router leaves, rather than leaving CAD-perfect square corners that don't match t
 (square the tenon's corners instead, or fillet both to match, depending on whether you plan to
 chisel the mortise square by hand).
 
+**VERIFIED 2026-09-21:** Mischaracterisation. Rule Fillet is not a second tool under the same button -- it is a
+**Type** inside the Fillet dialog. The documented difference is rule-based edge *selection* (All Edges, or Between
+Faces/Features, with a rounds/fillets filter), not parametric behaviour: both are ordinary parametric timeline
+features and neither is "more parametric" than the other. What Rule Fillet actually saves is selecting many edges by
+hand. Whether a Rule Fillet re-resolves its edge set when upstream geometry adds or removes edges is NOT documented
+by Autodesk for Fusion -- do not assume it without testing.
+
 ## 80. Command reference: Chamfer
 
 Modify > Chamfer (shortcut not given). Works on **edges only** (unlike Fillet, cannot select a
@@ -2589,6 +2625,12 @@ extends the selection to every edge that is tangentially continuous with it (e.g
 around a previously-filleted rounded corner) as a single smooth chamfer -- turn this on whenever
 chamfering a rounded/filleted profile, or the result will be visually discontinuous at the round.
 Also works on cylindrical/curved edges (rounding a dowel end).
+
+**VERIFIED 2026-09-21:** The Tangent Chain default recorded above is wrong. Autodesk's Tangent Chain reference page
+documents it as **checked by default**, in both the Fillet and Chamfer dialogs. The practical advice therefore
+inverts: it is already extending the selection beyond the edge you clicked, so read the highlighted selection before
+committing, and **uncheck** it when you want exactly one edge of a tangentially-continuous run. The rest of the
+entry (types, curved edges, multi-edge selection) stands.
 
 ## 81. Command reference: Combine -- the core joinery-cutting technique
 
@@ -2632,6 +2674,18 @@ deliberately considering whenever a project needs an actual thread rather than a
 hole. Drill point choice: flat-bottom vs angled (twist-drill) bottom -- flat is usually correct for
 woodworking (Kreg-style pocket holes, dowel holes, threaded inserts all use flat-bottom bits),
 whereas the angled default mimics a metal twist drill and looks wrong for typical shop hardware.
+
+**VERIFIED 2026-09-21:** Two corrections. (1) The checkbox is labelled **"Modeled"** (US spelling), not "Modeled
+Threads". It does create real 3D helical geometry, so that part of the entry is right. (2) "Cuttable" inverts
+Autodesk's guidance: model a thread when **3D printing** the part, and normally do *not* for one that will be
+machined -- a cosmetic thread carries the designation that drives a tap or thread mill, while modelled geometry
+mostly adds file weight. For woodworking the modelled form earns its place on printed jig parts, interference
+checks, and confirming a shop-made threaded insert actually fits.
+
+Also worth recording against this entry: the drill-point advice ("flat is usually correct for woodworking") is too
+general. Match the modelled point to the cutter actually used -- a Forstner leaves a flat bottom, a brad-point
+leaves a central spur, a twist drill leaves a cone. A blind hole modelled with the wrong point reads at the wrong
+usable depth.
 
 ## 83. Parametric setup: user parameters and derived expressions
 
@@ -2741,6 +2795,19 @@ feature* (not just its source sketch geometry) up a board's height using Pattern
 symmetric direction and a spacing expression that centers the tails (e.g.
 `(drawer_height/2) - dovetail_length`).
 
+**NOTE 2026-09-21 (uncertain -- flagged, not corrected):** Read literally, constraining the arm widths to `joinery`
+and the top-offset/taper to `joinery/3` implies a **1-in-3 dovetail slope**, far steeper than traditional practice
+(roughly 1:6 for softwoods and 1:8 for hardwoods, as a rule of thumb rather than a requirement). It is possible the
+dimension roles in this entry are being misread rather than the ratio being wrong, so this is flagged rather than
+changed.
+
+Shop-convention alternative, if starting fresh: keep **slope** as the driven parameter, since that is what a
+woodworker actually adjusts. `dovetail_slope` = 6 (softwood) or 8 (hardwood); `dovetail_angle = atan(1 /
+dovetail_slope)`, measured **from vertical** (parallel to the centreline), giving 9.46 deg for 1:6 and 7.13 deg for
+1:8; `taper = joinery / dovetail_slope`. Depth, taper and slope are not independent -- any two fix the third, so
+drive depth and slope and let taper follow, or the sketch over-constrains. Note also that 9.46 deg from vertical is
+the same cut as 80.54 deg from the baseline: fix the reference direction once and dimension every tail against it.
+
 ## 88. Mortise & tenon / dado / rabbet via the Combine "virtual router" technique
 
 See entry 81 for the mechanics. Applied specifically: cut a **dado** (shelf-support groove) into a
@@ -2827,6 +2894,13 @@ directly, letting a non-default posed state (exploded, door-open) be placed stra
 sheet instead of the plain model. After editing a storyboard, save the design -- any drawing built
 from it shows an "out of date" marker until its refresh/update icon is clicked (a staleness trap
 noted independently by two sources; see gotchas.md).
+
+**VERIFIED 2026-09-21:** The drawing capability is real but the UI path recorded above is wrong. It is **Workspace
+menu > Drawing > From Animation**, then select the storyboard from the **Reference** dropdown in the New Drawing
+dialog -- not a "Representation" option on a Base View. Documented limitation to plan around: drawing views already
+created from an animation do **not** update when that storyboard is later edited, and storyboards created afterwards
+are not offered as base views. The rest of the entry (build poses in Animation not Design, Auto Explode is a poor
+starting point, relocate the pivot before rotating, name storyboards) stands.
 
 ## 93. Materials: physical vs. appearance
 
@@ -2994,3 +3068,15 @@ is still the better place to review/rename/document the full parameter set after
   remotely revoke a hobbyist license's file access if it determines the account is being used to
   design items that are then sold -- anyone planning to sell what they build should look at the
   free small-business license tier instead (reported approval time: about a day).
+
+**VERIFIED 2026-09-21:** The licensing half of this entry is materially out of date; see the annotated licence
+entries in gotchas.md for the full check. In short: **STEP export is available** (the 2020 removal was announced
+then reversed before it took effect), **DXF is partial rather than blocked** (sketch DXF works via right-click >
+Save As DXF; File > Export DXF does not), and **"Quick Add" is not a current Autodesk term** at all. Still in force:
+PDF export blocked, one sheet per drawing, IGES and SAT blocked, 10 active documents, no cloud rendering (local
+rendering is included). The free business tier is **Autodesk Fusion for startups**, not a "small business licence",
+and its published eligibility now carries no revenue or funding threshold -- but explicitly excludes consultants,
+design agencies, service providers, contract manufacturers, makerspaces and non-profits.
+
+The buildability half of the entry stands unchanged, and generalises: a Fusion tutorial teaches Fusion. It does not
+validate the joinery, structure or engineering of what is being modelled.

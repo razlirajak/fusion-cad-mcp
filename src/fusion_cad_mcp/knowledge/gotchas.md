@@ -2091,6 +2091,17 @@ behavior, so if a drawing's BOM must report accurate quantities, verify how mirr
 roll up in that specific table rather than assuming, and prefer Copy over Mirror for schedule-
 sensitive parts when in doubt.
 
+**VERIFIED 2026-09-21:** Confirmed as behaviour, with the mechanism corrected and the open question in patterns.md
+#86 now resolved. The suffix Mirror adds lands on the component **name**, not the description -- that *is* the
+mechanism, since a parts list groups by component identity. Autodesk does not document the suffix anywhere, though
+it is consistently user-reported across forum threads from 2018 to 2026. Autodesk **does** document the remedy: use
+**copy/paste or Pattern** when creating multiples that must count correctly.
+
+So the source who concluded he "should have just copied them" was right, and the conflicting advice noted in
+patterns.md #86 can be closed: **prefer Copy or Pattern over Mirror for any part that must count in a BOM.** Mirror
+remains the better tool where its geometric guarantees matter and BOM roll-up does not -- a deliberate trade rather
+than an open question.
+
 ## Body vs. component confusion breaks BOM scheduling and edit-propagating duplication (2026-09-20)
 
 Plain bodies (as opposed to components) don't schedule correctly in a drawing's parts-list/BOM
@@ -2301,6 +2312,11 @@ of the already-documented mirrored-component BOM fragmentation (gotchas.md, mirr
 fragment BOM/quantity counts). Re-check mirrored-part descriptions in a parts table after any
 regeneration, not just after the initial generation.
 
+**VERIFIED 2026-09-21:** Still a single observation, and now correctly located: the suffix sits on the component
+**name**, not the description. Autodesk documents neither the suffix nor this failure. Treat as a version-specific
+observation rather than guaranteed behaviour -- but re-check mirrored parts whenever a parts list is regenerated
+either way.
+
 ## Fusion does not deduplicate independently-modeled parts that happen to match in a parts table (2026-09-20)
 
 Matching dimensions and material alone does not make Fusion treat two separately-built components
@@ -2320,6 +2336,18 @@ just that metadata can go stale, it's that there is no available live-linked alt
 base tool for cut-list dimensions specifically, so a generated cut list needs a full manual
 re-verification pass before it goes to the shop, every time.
 
+**VERIFIED 2026-09-21:** Correct, and sharper than recorded. The parts list column set is fixed -- **Item, Quantity,
+Part Number, Part Name, Description, Material, Mass** -- with no custom columns available. Quantity, Material and
+Mass **are** live-linked to the model. What Fusion cannot do is derive **length x width x thickness per part** from
+geometry, and Autodesk's own documented workaround is to type those dimensions into the component description: the
+one field that never updates.
+
+Two additions. Part Number is seeded from the component name at creation but does **not** follow later renames, so
+the browser and the parts list can silently disagree. And third-party add-ins that generate a cut list work by
+computing each component's bounding box and writing it into that same description field -- so they automate the
+fragile mechanism rather than replacing it, and must be re-run after every dimensional change. None is an Autodesk
+product.
+
 ## Exploded views require true components, not bodies or ad-hoc copies (2026-09-20)
 
 Auto Explode and manual exploding (Animation workspace, patterns.md #92) only work on real
@@ -2337,6 +2365,13 @@ views support correct dimensioning. Plan a drawing sheet's dimensioned views as 
 the start; use an isometric/exploded view for visual clarity only, never for a dimension a builder
 will actually cut to.
 
+**VERIFIED 2026-09-21:** Stands, and is stronger than recorded -- this is **documented by Autodesk**, not merely
+observed by viewers: "You can only dimension orthogonal drawing views. You cannot dimension isometric drawing
+views." Dimensions placed on an isometric view read foreshortened, and the only remedy Autodesk offers is editing
+the dimension to type the true value in, which then stops tracking the model entirely. There is no true-length
+option and no toggle. A base view at a custom orientation can be dimensioned; its projections cannot. Unchanged
+since at least 2018 and not addressed in the 2026 releases.
+
 ## Personal/hobbyist license has real export and workflow limits since a 2020 tier change (2026-09-20)
 
 Repeatedly confirmed across 5+ videos' comments: the free hobbyist tier no longer exports
@@ -2346,12 +2381,53 @@ sheets are gone; active documents are capped at 10. Reported workarounds: OS-lev
 sheets manually instead of via the removed Quick Add. Worth checking Fusion's current licensing
 terms directly before planning a workflow that assumes any of these are available on a free account.
 
+**VERIFIED 2026-09-21 against Autodesk's own licensing documentation:** partly wrong.
+
+- **STEP export works.** Autodesk announced its removal in 2020 and reversed the decision before it took effect.
+- **DXF is partial, not blocked:** sketch DXF works (right-click the sketch > Save As DXF); File > Export DXF does not.
+- **"Quick Add" could not be found as a current Autodesk term anywhere** -- treat it as a mis-remembered name rather
+  than a real restriction.
+- Still in force: PDF export from drawings blocked; **one sheet per drawing**, print only; IGES and SAT blocked;
+  **10 active documents** (unlimited inactive storage, files can be toggled); no cloud rendering, though **local
+  rendering is included**.
+- Full permitted export list: STEP, STL, OBJ, F3D, F3Z, IPT, FBX, SMT, SKP, sketch DXF.
+- Also worth knowing: a personal-use account added to someone else's commercial hub cannot save or export files
+  from it; share links are view-only with no download.
+
+Net shape for woodworking: geometry gets out fine, a dimensioned shop drawing does not. OS-level print-to-PDF
+remains the usual workaround and is not Autodesk-endorsed.
+
 ## A hobbyist license can be revoked if the account is used to design items that are then sold (2026-09-20)
 
 Multiple commenters warn that Autodesk can remotely revoke a personal/hobbyist license's file
 access if it determines designs made under it are being sold. If a project is ever likely to be
 sold rather than kept personal, the reported fix is switching to the free small-business license
 tier (reported approval turnaround: about a day) rather than risking the hobbyist account.
+
+**VERIFIED 2026-09-21:** Overstated -- three separate things are being run together here.
+
+**The documented rule.** Personal Use is for personal, non-commercial projects by individuals generating **less than
+$1,000 USD annually**, and not for use in employment or a company environment. Above that you are expected to stop
+and convert to a subscription. Note the $1,000 figure appears on Autodesk's product page rather than in the binding
+terms of service, which is a genuine ambiguity rather than a detail.
+
+**The documented consequence.** None specific. **No Autodesk page states that breaching the non-commercial terms
+costs you access to your files.** Autodesk's general terms do reserve broad rights to suspend access to your content
+and delete it on termination, and free offerings carry an explicit "may delete Your Content at any time without
+notice" clause plus a 365-day inactivity rule -- but those are generic rights, not a stated penalty for selling
+work.
+
+**The commenter claim** is an extrapolation from the second to the first, not something Autodesk documents.
+
+Practical consequence, and it is the useful part: because that deletion right applies regardless of conduct, **keep
+local STEP or F3D exports of anything that matters.** STEP export works on Personal Use, so the hedge costs nothing.
+
+On the recommended alternative: the free business tier is **Autodesk Fusion for startups**, not a "small business
+licence". Current published eligibility lists no revenue or funding threshold (treat any "under $1M" figure as
+unverified), but explicitly **excludes** service providers, consultants, design agencies, contract manufacturers,
+makerspaces and non-profits -- which rules out commissioned work structured as a service. Autodesk's marketing page
+states a 3-year term while its legal entitlements page states 1 year with a right to revoke on notice; the two
+disagree, so get the term confirmed in writing before relying on it.
 
 ## Join-mode extrude merges with ANY touching/connected body, not just the one intended (2026-09-20)
 
@@ -2371,6 +2447,16 @@ One commenter flags a project-level setting trap: unless a project/document is s
 no matter what's selected in the Extrude operation dropdown. If separate bodies/components aren't
 resulting despite explicitly choosing New Body/New Component, check which design mode the document
 is in before troubleshooting the individual feature.
+
+**VERIFIED 2026-09-21:** Half right. The feature is real -- Autodesk's Intent-Driven Design introduced document
+**design types**: Part Design, Assembly Design and Hybrid Design, chosen at document creation or changed later via
+**Browser > Document Settings > Design Type**. Hybrid is the default and matches classic Fusion behaviour. But the
+commenter's claim is contradicted: Autodesk's API documentation states a part design "typically contains **one or
+more bodies**", so multi-body modelling works and New Body / Join / Cut behave normally. The real restriction is
+that a Part Design **cannot contain internal components**, so the component tools simply are not offered. The
+symptom to expect is missing component commands, not misbehaving extrudes. Relevant to patterns.md #85, which asks
+for one component per board -- use Hybrid Design for furniture. (Design types were still labelled a preview feature
+as of late 2025.)
 
 ## A spline's Equal constraint only equalizes control-line lengths, not their angle -- can silently break sweep symmetry (2026-09-20)
 
@@ -2415,3 +2501,8 @@ tutorials were made, now defaulting to Z-up (the current industry-standard defau
 X-up. A model built by following an older tutorial's on-screen axis orientation may not match a
 current install's default -- the convention is changeable in Preferences if a specific orientation
 is needed to match older material.
+
+**VERIFIED 2026-09-21:** The old default was **Y up**, not X-up -- Fusion has never offered an X-up option, so read
+the commenter's "X-up" as Y up. Current default is **Z up**. The setting is **Preferences > General > Default
+modeling orientation**, it offers Z up or Y up only, it requires a restart, and it applies to new designs rather
+than ones already made. Autodesk staff confirm the change on the forums but publish no version or date for it.
