@@ -131,6 +131,7 @@ Internal units are cm. `ValueInput.createByString('30 mm')` accepts unit suffixe
 ### Verified in practice
 
 104. Axis-aligned casework: one sketch plane, offset-start extrudes
+105. Model a laminated part as its real stock layers
 
 ## 1. Idempotent user-parameter add
 
@@ -3131,3 +3132,46 @@ Companion habits that paid off in the same build:
   clear openings -- catches placement errors that per-part size checks cannot (section 12).
 - The section 20 fit-view block is required here: a script-built model in an unsaved `Untitled` document hits
   BOTH documented non-auto-fit conditions at once, and named-direction screenshots come back blank.
+
+## 105. Model a laminated part as its real stock layers
+
+A 2 in top glued up from two 1 in MDF slabs is TWO components, not one 2 in body. Modelled as one body the
+geometry is right and the parts list is wrong: it calls for a 2 in piece of stock that does not exist.
+
+Split it at the glue line and give each layer its own component. Which layer carries which cut then falls out
+of the geometry -- a 3/8 in plate recess and 3/8 in T-track grooves live in the top layer only; the lift
+through-hole goes through both.
+
+```python
+# the original slab extrude becomes the LOWER layer: shrink it in place
+ex.extentOne.distance.expression = 'mdf_slab'       # was 'top_t'
+ex.bodies.item(0).name = 'A_Top_Lower'
+ex.bodies.item(0).parentComponent.name = 'A_Top_Lower'
+
+# the UPPER layer is the same footprint, started one layer up
+ei.startExtent = adsk.fusion.OffsetStartDefinition.create(VI('cab_h + mdf_slab'))
+ei.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(VI('mdf_slab')),
+                    adsk.fusion.ExtentDirections.PositiveExtentDirection)
+```
+
+Drive the layer thickness from a stock parameter and the total from it (`top_t = 2 * mdf_slab`), never the
+reverse. Changing to 3/4 in stock is then one edit and the layers follow.
+
+**Order of operations.** Delete the cuts, split the slab, then rebuild the cuts against the new bodies. Editing
+a cut's `participantBodies` in place needs `timelineObject.rollTo(True)` (gotchas.md) and is only worth it for
+touch-ups; a full re-cut is simpler when the target bodies have changed identity.
+
+**Verification: the pieces must sum to the whole.** This is the cheapest possible check on a split and it is
+exact, so use equality rather than a tolerance band.
+
+```
+lower 699.9375 + upper 665.8594 = 1365.7969 in3
+one-piece slab before the split       = 1365.7969 in3
+```
+
+Any discrepancy means a cut landed on the wrong layer or missed one. Bounding boxes cannot catch this -- both
+layers have the footprint of the original.
+
+**Verified**: router-table cabinet top, 2026-09-21. Two 1 in MDF layers, five machining cuts redistributed
+across them, sum exact to four decimal places, zero feature errors, and correct behaviour when `mdf_slab` and
+`plate_t` were driven to values that push the recess through the top layer into the one below.

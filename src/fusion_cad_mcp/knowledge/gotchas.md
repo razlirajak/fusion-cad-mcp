@@ -42,6 +42,26 @@ Verified universal in current Fusion (build `4bca736941837d3e42bba21bb36b9891e34
 
 **Rule.** Default to XY for top-down designs (trays, panels, anything that lays flat). XZ for side-profile parts (brackets, arms), remembering to negate Y. Avoid YZ unless extrusion along world X is specifically wanted.
 
+**VERIFIED 2026-09-21.** The xZ mapping was re-confirmed by `worldGeometry` probe in the router-table-cabinet
+build: a sketch point at (5, 7) in on `xZConstructionPlane` reads world `(5, 0, -7)` in. Two facts this entry
+did not previously state, both from that probe:
+
+- **The xZ normal is `+Y`**, so `PositiveExtentDirection` extrudes toward +Y. A part sitting at positive Y is
+  reached by a positive one-sided distance from the plane.
+- **`addDistanceDimension` is unsigned**, so the negation does not leak into the parameters. Place the point at
+  sketch v = `-h`, then dimension origin-to-point and assign the positive expression. The sketch reads correctly
+  in the UI and the parameter reads `dust_z`, not `-dust_z`.
+
+**Diagnostic worth knowing.** If a cut removes nothing in `PositiveExtentDirection` *and* nothing in
+`NegativeExtentDirection`, stop flipping the direction -- the profile is not where you think it is. Two failures
+in opposite directions is evidence about the sketch, not about the extrude. Probe `worldGeometry` before the
+third attempt. (Cost roughly four wasted cycles on 2026-09-21 before the probe was run.)
+
+**Not a trap, tested 2026-09-21:** a symmetric extent DOES honour `OffsetStartDefinition`. A symmetric extent of
+4 in with a 50 in start offset produces a body spanning z 48 to 52, not -2 to 2. Symmetry is measured about the
+offset start plane, not about the sketch plane.
+
+
 ## Self-intersecting polygon returns `profiles.count == 2`
 
 A polygon where two edges cross internally (e.g. an 8-vertex Z-profile where edges V8 to V1 cross V5 to V6, producing a figure-8) is treated by Fusion as TWO closed profiles, not an error. The extrude succeeds and produces wrong geometry.
@@ -2546,3 +2566,60 @@ for p in des.userParameters:
 
 Note this is the *inverse* of the usual literals problem: the expression is properly parametric and still
 produces the wrong number.
+
+## `participantBodies` can only be touched with the feature rolled into edit position (2026-09-21)
+
+Reading or writing `ExtrudeFeature.participantBodies` on an existing feature raises:
+
+```
+RuntimeError: 3 : Didn't roll editing feature back.
+```
+
+Setting `design.timeline.markerPosition` to the feature's index + 1 by hand does NOT satisfy it -- the marker
+moves, the property still throws. The rollback has to be requested through the feature itself:
+
+```python
+f.timelineObject.rollTo(True)          # roll to just BEFORE this feature
+f = feature_by_name('cut_Plate_Recess')  # RE-FETCH: the old handle is stale after the roll
+print([b.name for b in f.participantBodies])
+f.participantBodies = [upper, lower]
+design.timeline.moveToEnd()
+```
+
+Two details that matter:
+
+- **Re-fetch the feature after `rollTo`.** The handle held across the roll is stale and throws again.
+- **`moveToEnd()` per feature.** Editing several features in one pass, roll and restore around each one rather
+  than rolling once and editing them all -- the second edit throws otherwise.
+
+Contrast `gotchas.md` "Moving an occurrence: rollTo and snapshots both revert the move", where rolling is
+exactly what you must NOT do. Rolling is required for feature-input edits and fatal for pending occurrence
+transforms. They are different operations that happen to share a verb.
+
+## A cut silently stops at a body boundary when the neighbour is not a participant (2026-09-21)
+
+`participantBodies` is already documented as required for targeting a specific body. The failure mode that is
+NOT obvious: when the cut's depth is parameter-driven and grows past the body it was given, it just stops.
+
+- No feature error. `healthState` stays `HealthyFeatureHealthState`.
+- No warning in the browser tree.
+- The part is simply under-cut, and only a volume check finds it.
+
+Caught in the router-table cabinet, 2026-09-21. A plate recess cut into the upper of two laminated 1 in MDF
+slabs listed only the upper slab. Driving `plate_t` to 0.75 in while `mdf_slab` dropped to 0.5 in should have
+taken the recess 0.25 in into the lower slab. It did not; the parameter stress test reported zero errors and the
+ledge was quietly wrong.
+
+**Fix: list every body the cut could EVER reach, not the ones it reaches today.**
+
+```python
+ei.participantBodies = [upper, lower]   # lower is untouched at today's values -- list it anyway
+```
+
+**A participant the cut does not intersect is harmless.** Verified the same day: adding the lower slab to four
+cuts that do not reach it produced no error and no volume change at all (699.9375 / 665.8594 in3 before and
+after, to four decimal places). There is no cost to over-listing, and the cost of under-listing is a wrong part
+that passes every check.
+
+**Habit.** "Zero feature errors" is not "correct". Pair every parameter stress test with a volume assertion on
+the parts the changed parameter should have altered.
