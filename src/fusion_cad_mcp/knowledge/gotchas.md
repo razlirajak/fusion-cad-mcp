@@ -2679,3 +2679,46 @@ j.jointMotion.rotationValue = 0.0
 
 Same applies to sliders: a drawer pulling toward the front of a cabinet modelled with the front at
 y=0 travels in NEGATIVE y, so its limits are `-travel .. 0`.
+
+## The wood species you want are split across two libraries (2026-09-24)
+
+Checked on a current install while materialling a woodworking model. This is the opposite of what
+you would guess, and it makes "assign the right material" actively make the model look worse.
+
+**`Fusion Appearance Library` has no maple, no birch, no plywood and no MDF.** Its complete wood
+selection is seven entries: Bamboo Light - Semigloss, Cherry, Mahogany, Oak, Oak - Semigloss, Pine,
+Walnut. Nothing resembling sheet goods.
+
+**`Fusion Material Library` has all of them** -- Birch, Maple, Plywood (Finish and Sheathing), MDF
+Medium Density Fiberboard, Particleboard -- with usable densities (plywood 552, maple 705, birch 512,
+MDF 800 kg/m3).
+
+**But every one of those materials carries `appearance = 'Surface - Matte'`**, a flat grey. Assign
+`Plywood, Finish` for correct mass and the part renders grey.
+
+So the two have to be set from two different libraries:
+
+```python
+mlib = app.materialLibraries.itemByName('Fusion Material Library')
+alib = app.materialLibraries.itemByName('Fusion Appearance Library')
+occ.component.material = mlib.materials.itemByName('Plywood, Finish')   # mass / BOM
+a = des.appearances.addByCopy(alib.appearances.itemByName('Bamboo Light - Semigloss'), 'Shop - Plywood')
+occ.appearance = a                     # looks
+for b in occ.bRepBodies:
+    b.appearance = a                   # see below
+```
+
+**Set the appearance on the BODY as well as the occurrence.** Setting only `occurrence.appearance`
+left two of fifteen faces rendering as the material's grey. Setting both on every body was
+deterministic. Cheap insurance; no downside observed.
+
+**Appearance copies cannot be deleted while in use.** `appearance.deleteMe()` raises
+`3 : the material is in use`, and `addByCopy` with the same name then raises
+`3 : appearance name already exists in document`. To re-do a scheme, add under a new name and
+re-assign, or clear the assignments first.
+
+**Sub-assembly occurrences** have no `bRepBodies` of their own -- walk `childOccurrences` or the
+drawer interiors keep the default appearance.
+
+**Verified**: router table cabinet, 2026-09-24. 44 plywood parts, 15 maple, 2 MDF; total mass
+81.3 kg (179 lb) split 54.2 / 9.2 / 17.9, which is only meaningful because the materials are real.
