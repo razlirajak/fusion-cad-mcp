@@ -132,6 +132,7 @@ Internal units are cm. `ValueInput.createByString('30 mm')` accepts unit suffixe
 
 104. Axis-aligned casework: one sketch plane, offset-start extrudes
 105. Model a laminated part as its real stock layers
+106. Make an assembly move: ground, rigid-group, then one joint per assembly
 
 ## 1. Idempotent user-parameter add
 
@@ -3175,3 +3176,49 @@ layers have the footprint of the original.
 **Verified**: router-table cabinet top, 2026-09-21. Two 1 in MDF layers, five machining cuts redistributed
 across them, sum exact to four decimal places, zero feature errors, and correct behaviour when `mdf_slab` and
 `plate_t` were driven to values that push the recess through the top layer into the one below.
+
+## 106. Make an assembly move: ground, rigid-group, then one joint per assembly
+
+Getting drawers to slide and a door to swing is three steps, and the first two are the ones people
+skip. Order matters.
+
+**1. Ground everything that does not move -- all of it, not one part.** Nothing in a Fusion assembly
+is fixed by default. With nothing grounded, driving a drawer joint is as likely to move the cabinet.
+
+```python
+for o in root.occurrences:
+    if o.component.name in STATIC:
+        o.isGrounded = True
+```
+
+**2. Rigid-group each moving assembly with the parts that ride on it.** A drawer box and its applied
+front are separate components; without a rigid group the box slides out and the face stays behind.
+A sliding tray is worse -- side panel, shelves, shelf ends and face, all loose.
+
+```python
+coll = adsk.core.ObjectCollection.create()
+for name in members:
+    coll.add(occ[name])
+rg = root.rigidGroups.add(coll, True)
+rg.name = 'RG_Drawer_1'
+```
+
+**3. One as-built joint per group**, from any single member to any grounded part. The rigid group
+carries the rest, so a seven-part tray still needs exactly one joint.
+
+Then set limits, and TEST by driving each joint: confirm the parts that should move did, that nothing
+grounded moved, and reset to zero before saving. See gotchas.md for the anchor-geometry requirement,
+the non-parametric limits, and the sign trap on swing and slide direction.
+
+**Why as-built rather than a plain Joint.** Everything was already modelled in position from a shared
+origin (section 104), so there is nothing to move -- an as-built joint defines the motion and leaves
+the geometry exactly where it is. A plain Joint would try to reposition parts that are already right.
+
+**Bonus worth knowing.** This also fixes the static-placement limitation of occurrence transforms:
+a jointed component's position is defined by geometry, so it follows a parameter change. Copies
+placed by transform alone do not. Grounded parts do not care either way -- they have nothing to follow.
+
+**Verified**: router table cabinet, 2026-09-24. 20 grounded carcass parts, 6 rigid groups, 7 as-built
+joints (4 drawer sliders, 2 tray sliders, 1 door hinge). Each joint driven and reset; drawer fronts
+and tray faces tracked their boxes to 0.01 in; no grounded part moved. Parameter sweep at
+44x40 / thicker stock / 28x28 left all 7 joints and 6 groups intact with zero feature errors.

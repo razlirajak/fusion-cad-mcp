@@ -2623,3 +2623,59 @@ that passes every check.
 
 **Habit.** "Zero feature errors" is not "correct". Pair every parameter stress test with a volume assertion on
 the parts the changed parameter should have altered.
+
+## As-built joints need an anchor even when the motion does not (2026-09-24)
+
+`AsBuiltJoints.createInput(occ1, occ2, geometry)` looks like it should take `None` for a slider --
+a slider needs a direction, not a point. It does not:
+
+```
+RuntimeError: 3 : Geometry should not be null if joint motion is not rigid
+```
+
+Only `setAsRigidJointMotion` accepts a null geometry. Everything else wants an anchor, even when the
+anchor plays no part in the motion. Any vertex on the moving part will do:
+
+```python
+geo = adsk.fusion.JointGeometry.createByPoint(body.vertices.item(0))
+ji  = root.asBuiltJoints.createInput(mover, grounded_part, geo)
+ji.setAsSliderJointMotion(adsk.fusion.JointDirections.YAxisJointDirection, None)
+```
+
+For a revolute the anchor DOES matter, because it locates the axis. Pass the hinge edge through
+`JointGeometry.createByCurve(edge, JointKeyPointTypes.StartKeyPoint)` and set the motion with
+`CustomJointDirection` plus that same edge -- the edge then IS the hinge line.
+
+**Sub-assembly note.** An occurrence that is a sub-assembly has no `bRepBodies` of its own; walk
+`childOccurrences` for a body to anchor to.
+
+## Joint limits store values, not expressions (2026-09-24)
+
+`slideLimits.minimumValue` and `rotationLimits.maximumValue` are plain doubles in internal units --
+cm for a slider, radians for a revolute. There is no expression field, so a limit cannot be bound to
+a user parameter the way a sketch dimension can.
+
+Consequence: setting a limit from `userParameters.itemByName('drawer_travel').value` captures the
+number at that moment. Change `drawer_travel` later and the limit does not follow. The geometry
+rebuilds, the limit does not.
+
+**Habit:** treat limits as a snapshot. Re-assert them from the parameter after any change to the
+parameter they were derived from, and say so in the model notes rather than assuming they track.
+
+## A swing direction that looks right in the dialog can be backwards (2026-09-24)
+
+A revolute joint built from a hinge edge with limits `0 .. +angle` swung a cabinet door INTO the
+carcass rather than out of it. No error, no interference warning; the door simply passed through the
+shelves. The fix was limits `-angle .. 0`.
+
+The sign depends on the edge's own direction, which is not visible anywhere in the UI. **Verify by
+driving the joint and reading a bounding box**, not by looking at the dialog:
+
+```python
+j.jointMotion.rotationValue = math.radians(-90)
+print(occ.boundingBox.minPoint.y, occ.boundingBox.maxPoint.y)   # should move to the OPEN side
+j.jointMotion.rotationValue = 0.0
+```
+
+Same applies to sliders: a drawer pulling toward the front of a cabinet modelled with the front at
+y=0 travels in NEGATIVE y, so its limits are `-travel .. 0`.
